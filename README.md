@@ -175,3 +175,25 @@ Dari `project-root/`:
 1.  **User API:** `REGISTER` $\rightarrow$ `LOGIN` (set `currentUsername` di CLI).
 2.  **Transaction API:** `ADD` beberapa transaksi $\rightarrow$ `GET_SUMMARY` $\rightarrow$ `GET_ALL`.
 3.  **Report API:** `REQ_REPORT` dan generate laporan ke `reports/report_cli.csv`.
+
+---
+
+## 7. 🌐 BE1 Socket Server (Ringkas)
+
+- File: `src/Server.java`, `src/ClientHandler.java`.
+- Port: `3000`; loop `accept()` dan spawn thread per klien.
+- Broadcast: `Server.broadcast(String msg)` mengirim ke semua klien aktif.
+- Integrasi BE2: semua command teks diproses oleh `Backend2Facade.handleTextCommand(...)`.
+- Mutasi data (`ADD|`, `UPDATE|`, `DELETE|`): server broadcast `REFRESH_TABLE` dan `SUMMARY|...` terbaru.
+- Login sederhana: mendukung `LOGIN|username` (handshake) dan format BE2 `LOGIN|username|password`.
+- Report streaming: `REQ_REPORT` → kirim `FILE_SIZE|n` → tunggu `READY_TO_RECEIVE` → stream CSV bytes via `Backend2Facade.writeReportToStream(...)`.
+
+### Cara Menjalankan Server
+
+Windows PowerShell:
+
+```powershell
+cd "c:\Users\ASUS\Documents\Code\fintrack-backend2\src"
+javac Server.java ClientHandler.java Backend2Facade.java model\*.java persistence\*.java service\*.java
+java Server
+```
