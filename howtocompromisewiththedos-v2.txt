@@ -1,0 +1,1295 @@
+Merged Files Output
+=====================
+
+===== File: src/Backend2CliApp.java =====
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Scanner;
+
+public class Backend2CliApp {
+
+    private final Backend2Facade backend;
+    private final Scanner scanner;
+
+    // "Session" sederhana di sisi CLI: siapa user yang sedang login
+    private String currentUsername = null;
+
+    public Backend2CliApp() {
+        this.backend = new Backend2Facade();
+        this.scanner = new Scanner(System.in);
+    }
+
+    public static void main(String[] args) {
+        Backend2CliApp app = new Backend2CliApp();
+        app.run();
+    }
+
+    private void run() {
+        System.out.println("===================================");
+        System.out.println("  FinTrack Backend2 CLI Tester");
+        System.out.println("===================================");
+        System.out.println("Tips:");
+        System.out.println("- Mulai dari menu User API untuk REGISTER & LOGIN.");
+        System.out.println("- Setelah LOGIN, semua transaksi akan otomatis pakai username tersebut.");
+        System.out.println("- Lalu coba Transaction API untuk ADD / UPDATE / DELETE.");
+        System.out.println("- Lalu gunakan Report API untuk generate CSV.\n");
+
+        boolean running = true;
+        while (running) {
+            System.out.println();
+            System.out.println("=== MAIN MENU ===");
+            System.out.println("User aktif : " + (currentUsername == null ? "(belum login)" : currentUsername));
+            System.out.println("1. User API (Register / Login / Change Password)");
+            System.out.println("2. Transaction API (CRUD & Summary)");
+            System.out.println("3. Report API (REQ_REPORT & Generate CSV)");
+            System.out.println("4. Keluar");
+            System.out.print("Pilih menu [1-4]: ");
+
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1":
+                    userMenu();
+                    break;
+                case "2":
+                    transactionMenu();
+                    break;
+                case "3":
+                    reportMenu();
+                    break;
+                case "4":
+                    running = false;
+                    System.out.println("Keluar dari CLI Tester. Bye!");
+                    break;
+                default:
+                    System.out.println("Pilihan tidak dikenal. Coba lagi.");
+            }
+        }
+    }
+
+    // ===================== HELPER INPUT =====================
+
+    private String askNonEmpty(String label, String exampleHint) {
+        while (true) {
+            if (exampleHint != null && !exampleHint.isEmpty()) {
+                System.out.print(label + " (contoh: " + exampleHint + "): ");
+            } else {
+                System.out.print(label + ": ");
+            }
+            String val = scanner.nextLine().trim();
+            if (!val.isEmpty()) {
+                return val;
+            }
+            System.out.println("Input tidak boleh kosong. Coba lagi.");
+        }
+    }
+
+    private double askDouble(String label, String exampleHint) {
+        while (true) {
+            if (exampleHint != null && !exampleHint.isEmpty()) {
+                System.out.print(label + " (contoh: " + exampleHint + "): ");
+            } else {
+                System.out.print(label + ": ");
+            }
+            String txt = scanner.nextLine().trim();
+            try {
+                return Double.parseDouble(txt);
+            } catch (NumberFormatException e) {
+                System.out.println("Format angka tidak valid. Coba lagi.");
+            }
+        }
+    }
+
+    private String askTypeOption() {
+        while (true) {
+            System.out.println("Pilih Type Transaksi:");
+            System.out.println("1. INCOME  (Pemasukan)");
+            System.out.println("2. EXPENSE (Pengeluaran)");
+            System.out.print("Pilih [1-2]: ");
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1":
+                    return "INCOME";
+                case "2":
+                    return "EXPENSE";
+                default:
+                    System.out.println("Pilihan tidak valid. Coba lagi.");
+            }
+        }
+    }
+
+    // ===================== USER MENU =====================
+
+    private void userMenu() {
+        boolean back = false;
+        while (!back) {
+            System.out.println();
+            System.out.println("=== USER API MENU ===");
+            System.out.println("User aktif : " + (currentUsername == null ? "(belum login)" : currentUsername));
+            System.out.println("1. REGISTER");
+            System.out.println("2. LOGIN");
+            System.out.println("3. CHANGE_PASSWORD");
+            System.out.println("4. Kembali ke MAIN MENU");
+            System.out.print("Pilih [1-4]: ");
+
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1":
+                    doRegister();
+                    break;
+                case "2":
+                    doLogin();
+                    break;
+                case "3":
+                    doChangePassword();
+                    break;
+                case "4":
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Pilihan tidak dikenal.");
+            }
+        }
+    }
+
+    private void doRegister() {
+        System.out.println("\n--- REGISTER USER ---");
+        String username = askNonEmpty("Username", "indra");
+        String password = askNonEmpty("Password", "12345");
+
+        String cmd = "REGISTER|" + username + "|" + password;
+        String resp = backend.handleTextCommand(cmd);
+        System.out.println("RESP: " + resp);
+    }
+
+    private void doLogin() {
+        System.out.println("\n--- LOGIN USER ---");
+        String username = askNonEmpty("Username", "indra");
+        String password = askNonEmpty("Password", "12345");
+
+        String cmd = "LOGIN|" + username + "|" + password;
+        String resp = backend.handleTextCommand(cmd);
+        System.out.println("RESP: " + resp);
+
+        if (resp.startsWith("LOGIN_OK|")) {
+            // Ambil username dari response dan set sebagai user aktif
+            String[] parts = resp.split("\\|");
+            if (parts.length >= 2) {
+                currentUsername = parts[1];
+                System.out.println(">> Login berhasil. User aktif sekarang: " + currentUsername);
+            }
+        } else {
+            System.out.println(">> Login gagal. User aktif tidak berubah.");
+        }
+    }
+
+    private void doChangePassword() {
+        System.out.println("\n--- CHANGE PASSWORD ---");
+
+        if (currentUsername == null) {
+            System.out.println("Anda belum LOGIN. Silakan login dahulu di menu User API.");
+            return;
+        }
+
+        System.out.println("User yang akan diganti password-nya: " + currentUsername);
+        String oldPass  = askNonEmpty("Password lama", "12345");
+        String newPass  = askNonEmpty("Password baru", "99999");
+
+        String cmd = "CHANGE_PASSWORD|" + currentUsername + "|" + oldPass + "|" + newPass;
+        String resp = backend.handleTextCommand(cmd);
+        System.out.println("RESP: " + resp);
+    }
+
+    // ===================== TRANSACTION MENU =====================
+
+    private void transactionMenu() {
+        if (currentUsername == null) {
+            System.out.println();
+            System.out.println("[WARNING] Anda belum LOGIN.");
+            System.out.println("Silakan login dulu di menu User API sebelum mengelola transaksi.");
+            return;
+        }
+
+        boolean back = false;
+        while (!back) {
+            System.out.println();
+            System.out.println("=== TRANSACTION API MENU ===");
+            System.out.println("User aktif : " + currentUsername);
+            System.out.println("1. ADD (Create)");
+            System.out.println("2. UPDATE (Update by ID)");
+            System.out.println("3. DELETE (Delete by ID)");
+            System.out.println("4. GET_ALL (List semua transaksi)");
+            System.out.println("5. GET_SUMMARY (Ringkasan total)");
+            System.out.println("6. Kembali ke MAIN MENU");
+            System.out.print("Pilih [1-6]: ");
+
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1":
+                    doAddTransaction();
+                    break;
+                case "2":
+                    doUpdateTransaction();
+                    break;
+                case "3":
+                    doDeleteTransaction();
+                    break;
+                case "4":
+                    doGetAllTransactions();
+                    break;
+                case "5":
+                    doGetSummary();
+                    break;
+                case "6":
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Pilihan tidak dikenal.");
+            }
+        }
+    }
+
+    private void doAddTransaction() {
+        System.out.println("\n--- ADD TRANSACTION ---");
+
+        if (currentUsername == null) {
+            System.out.println("Anda belum LOGIN. Operasi dibatalkan.");
+            return;
+        }
+
+        String date     = askNonEmpty("Tanggal (YYYY-MM-DD)", "2025-12-02");
+        String desc     = askNonEmpty("Deskripsi", "Gaji Bulanan");
+        String category = askNonEmpty("Kategori", "Gaji / Makanan / Transport");
+        String type     = askTypeOption();
+        double amount   = askDouble("Jumlah (angka)", "8500000");
+
+        // Username tidak ditanya lagi, pakai currentUsername
+        String cmd = "ADD|" + currentUsername + "|" + date + "|" + desc + "|" + category + "|" + type + "|" + amount;
+        String resp = backend.handleTextCommand(cmd);
+        System.out.println("RESP (SUMMARY): " + resp);
+    }
+
+    private void doUpdateTransaction() {
+        System.out.println("\n--- UPDATE TRANSACTION ---");
+
+        if (currentUsername == null) {
+            System.out.println("Anda belum LOGIN. Operasi dibatalkan.");
+            return;
+        }
+
+        System.out.println("Tips:");
+        System.out.println("- Jalankan dulu menu: GET_ALL untuk melihat ID transaksi.");
+        System.out.println("- Copy ID dari sana, lalu paste di sini.");
+        String id       = askNonEmpty("ID transaksi yang akan di-update", "622b3592-...");
+
+        String date     = askNonEmpty("Tanggal baru (YYYY-MM-DD)", "2025-12-05");
+        String desc     = askNonEmpty("Deskripsi baru", "Gaji Bonus");
+        String category = askNonEmpty("Kategori baru", "Gaji / Makanan / Hiburan");
+        String type     = askTypeOption();
+        double amount   = askDouble("Jumlah baru (angka)", "5000000");
+
+        // Username tidak diminta lagi, pakai currentUsername
+        String cmd = "UPDATE|" + id + "|" + currentUsername + "|" + date + "|" + desc + "|" + category + "|" + type + "|" + amount;
+        String resp = backend.handleTextCommand(cmd);
+        System.out.println("RESP: " + resp);
+    }
+
+    private void doDeleteTransaction() {
+        System.out.println("\n--- DELETE TRANSACTION ---");
+
+        if (currentUsername == null) {
+            System.out.println("Anda belum LOGIN. Operasi dibatalkan.");
+            return;
+        }
+
+        System.out.println("Tips:");
+        System.out.println("- Jalankan dulu menu: GET_ALL untuk melihat ID transaksi.");
+        System.out.println("- Copy ID dari sana, lalu paste di sini.");
+        String id = askNonEmpty("ID transaksi yang akan dihapus", "622b3592-...");
+
+        String cmd = "DELETE|" + id;
+        String resp = backend.handleTextCommand(cmd);
+        System.out.println("RESP: " + resp);
+    }
+
+    private void doGetAllTransactions() {
+        System.out.println("\n--- GET_ALL TRANSACTIONS ---");
+        String resp = backend.handleTextCommand("GET_ALL");
+        System.out.println("RESP:");
+        System.out.println(resp);
+        System.out.println("\nCatatan:");
+        System.out.println("- Format: DATA_ALL|id;date;description;category;type;amount#id2;...");
+        System.out.println("- ID inilah yang dipakai untuk UPDATE / DELETE.");
+    }
+
+    private void doGetSummary() {
+        System.out.println("\n--- GET_SUMMARY ---");
+        String resp = backend.handleTextCommand("GET_SUMMARY");
+        System.out.println("RESP: " + resp);
+        System.out.println("Format: SUMMARY|totalBalance|totalIncome|totalExpense");
+    }
+
+    // ===================== REPORT MENU =====================
+
+    private void reportMenu() {
+        boolean back = false;
+        while (!back) {
+            System.out.println();
+            System.out.println("=== REPORT API MENU ===");
+            System.out.println("User aktif : " + (currentUsername == null ? "(belum login)" : currentUsername));
+            System.out.println("1. REQ_REPORT (tampilkan FILE_SIZE)");
+            System.out.println("2. Generate & Simpan CSV (report_cli.csv atau custom)");
+            System.out.println("3. Kembali ke MAIN MENU");
+            System.out.print("Pilih [1-3]: ");
+
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1":
+                    doReqReportHeader();
+                    break;
+                case "2":
+                    doGenerateReportFile();
+                    break;
+                case "3":
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Pilihan tidak dikenal.");
+            }
+        }
+    }
+
+    private void doReqReportHeader() {
+        System.out.println("\n--- REQ_REPORT HEADER ---");
+        String resp = backend.handleTextCommand("REQ_REPORT");
+        System.out.println("RESP: " + resp);
+        System.out.println("Format: FILE_SIZE|<panjang_dalam_byte>");
+    }
+
+    private void doGenerateReportFile() {
+        System.out.println("\n--- GENERATE REPORT CSV ---");
+        System.out.println("File akan disimpan di folder reports/ (atau path yang kamu isi).");
+        String filename = askNonEmpty("Nama file output", "reports/report_cli.csv");
+
+        byte[] data = backend.getReportBytes();
+        try (FileOutputStream fos = new FileOutputStream(filename)) {
+            fos.write(data);
+            System.out.println("Report berhasil disimpan ke file: " + filename);
+            System.out.println("Ukuran (bytes): " + data.length);
+        } catch (IOException e) {
+            System.out.println("Gagal menulis file: " + e.getMessage());
+        }
+    }
+}
+
+===== End of src/Backend2CliApp.java =====
+
+===== File: src/Backend2Facade.java =====
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
+
+public class Backend2Facade {
+
+    private final TransactionService transactionService;
+    private final ReportService reportService;
+    private final UserManager userManager;
+
+    public Backend2Facade() {
+        this.transactionService = new TransactionService();
+        this.reportService = new ReportService();
+        this.userManager = new UserManager();
+    }
+
+    // ====== API TEXT-BASED UNTUK BACKEND 1 (via string command) ======
+
+    public String handleTextCommand(String line) {
+        if (line == null || line.isEmpty()) {
+            return "ERROR|EMPTY_COMMAND";
+        }
+
+        // --- REGISTER ---
+        // Format: REGISTER|username|password
+        if (line.startsWith("REGISTER|")) {
+            String[] parts = line.split("\\|");
+            if (parts.length != 3) {
+                return "ERROR|REGISTER_FORMAT";
+            }
+            String username = parts[1];
+            String password = parts[2];
+
+            boolean ok = userManager.registerUser(username, password);
+            if (ok) {
+                return "REGISTER_OK|" + username;
+            } else {
+                return "ERROR|USER_EXISTS|" + username;
+            }
+        }
+
+        // --- LOGIN ---
+        // Format: LOGIN|username|password
+        if (line.startsWith("LOGIN|")) {
+            String[] parts = line.split("\\|");
+            if (parts.length != 3) {
+                return "ERROR|LOGIN_FORMAT";
+            }
+            String username = parts[1];
+            String password = parts[2];
+
+            boolean valid = userManager.validateLogin(username, password);
+            if (valid) {
+                return "LOGIN_OK|" + username;
+            } else {
+                return "LOGIN_FAIL|INVALID_CREDENTIALS";
+            }
+        }
+
+        // --- CHANGE PASSWORD ---
+        // Format: CHANGE_PASSWORD|username|oldPassword|newPassword
+        if (line.startsWith("CHANGE_PASSWORD|")) {
+            String[] parts = line.split("\\|");
+            if (parts.length != 4) {
+                return "ERROR|CHANGE_PASSWORD_FORMAT";
+            }
+            String username    = parts[1];
+            String oldPassword = parts[2];
+            String newPassword = parts[3];
+
+            boolean ok = userManager.changePassword(username, oldPassword, newPassword);
+            if (ok) {
+                return "CHANGE_PASSWORD_OK|" + username;
+            } else {
+                return "CHANGE_PASSWORD_FAIL|INVALID_CREDENTIALS";
+            }
+        }
+
+        // --- ADD transaksi ---
+        // Format: ADD|username|date|description|category|type|amount
+        if (line.startsWith("ADD|")) {
+            transactionService.addTransactionFromCommand(line);
+            FinancialSummary summary = transactionService.getSummary();
+            return summary.toProtocolString(); // SUMMARY|...
+        }
+
+        // --- UPDATE transaksi ---
+        // Format: UPDATE|id|username|date|description|category|type|amount
+        if (line.startsWith("UPDATE|")) {
+            boolean updated = transactionService.updateTransactionFromCommand(line);
+            if (updated) {
+                FinancialSummary summary = transactionService.getSummary();
+                return summary.toProtocolString();
+            } else {
+                return "ERROR|UPDATE_NOT_FOUND";
+            }
+        }
+
+        // --- DELETE transaksi ---
+        // Format: DELETE|id
+        if (line.startsWith("DELETE|")) {
+            boolean deleted = transactionService.deleteTransactionFromCommand(line);
+            if (deleted) {
+                FinancialSummary summary = transactionService.getSummary();
+                return summary.toProtocolString();
+            } else {
+                return "ERROR|DELETE_NOT_FOUND";
+            }
+        }
+
+        // --- GET_ALL transaksi ---
+        if ("GET_ALL".equalsIgnoreCase(line)) {
+            return transactionService.buildAllTransactionsMessage();
+        }
+
+        // --- GET_SUMMARY untuk dashboard ---
+        if ("GET_SUMMARY".equalsIgnoreCase(line)) {
+            FinancialSummary summary = transactionService.getSummary();
+            return summary.toProtocolString();
+        }
+
+        // --- REQ_REPORT: balas header FILE_SIZE ---
+        if ("REQ_REPORT".equalsIgnoreCase(line)) {
+            byte[] report = getReportBytes();
+            int size = report.length;
+            return "FILE_SIZE|" + size;
+        }
+
+        return "ERROR|UNKNOWN_COMMAND|" + line;
+    }
+
+    // ====== API BINARY UNTUK LAPORAN ======
+
+    public byte[] getReportBytes() {
+        List<Transaction> list = transactionService.getAllTransactions();
+        return reportService.buildCsvBytes(list);
+    }
+
+    public void writeReportToStream(OutputStream out) throws IOException {
+        byte[] data = getReportBytes();
+        out.write(data);
+        out.flush();
+    }
+
+    public TransactionService getTransactionService() {
+        return transactionService;
+    }
+}
+
+===== End of src/Backend2Facade.java =====
+
+===== File: src/model/FinancialSummary.java =====
+import java.io.Serializable;
+
+public class FinancialSummary implements Serializable {
+
+    private double totalBalance;
+    private double totalIncome;
+    private double totalExpense;
+
+    public FinancialSummary(double totalIncome, double totalExpense) {
+        this.totalIncome = totalIncome;
+        this.totalExpense = totalExpense;
+        this.totalBalance = totalIncome - totalExpense;
+    }
+
+    public double getTotalBalance() {
+        return totalBalance;
+    }
+
+    public double getTotalIncome() {
+        return totalIncome;
+    }
+
+    public double getTotalExpense() {
+        return totalExpense;
+    }
+
+    /**
+     * Dipakai untuk kirim ke client lewat socket.
+     * Angka dibulatkan ke long supaya tidak keluar dalam format 1.7E7.
+     *
+     * Format: SUMMARY|balance|income|expense
+     */
+    public String toProtocolString() {
+        long balance = Math.round(totalBalance);
+        long income  = Math.round(totalIncome);
+        long expense = Math.round(totalExpense);
+
+        return "SUMMARY|" + balance + "|" + income + "|" + expense;
+    }
+}
+
+===== End of src/model/FinancialSummary.java =====
+
+===== File: src/model/Transaction.java =====
+import java.io.Serializable;
+
+public class Transaction implements Serializable {
+
+    private String id;          // ID unik (UUID / timestamp)
+    private String username;    // siapa yang input
+    private String date;        // format: YYYY-MM-DD
+    private String description; // keterangan
+    private String category;    // contoh: Gaji, Makanan, Transport
+    private String type;        // "INCOME" atau "EXPENSE"
+    private double amount;      // nominal
+
+    public Transaction(String id, String username, String date,
+                       String description, String category,
+                       String type, double amount) {
+        this.id = id;
+        this.username = username;
+        this.date = date;
+        this.description = description;
+        this.category = category;
+        this.type = type;
+        this.amount = amount;
+    }
+
+    // Dipakai saat simpan ke file (Stream)
+    public String toCSV() {
+        return id + "|" + username + "|" + date + "|" + description + "|" 
+               + category + "|" + type + "|" + amount;
+    }
+
+    // Dipakai saat baca dari file
+    public static Transaction fromCSV(String line) {
+        String[] parts = line.split("\\|");
+        if (parts.length != 7) {
+            throw new IllegalArgumentException("Format data tidak valid: " + line);
+        }
+        return new Transaction(
+                parts[0],                       // id
+                parts[1],                       // username
+                parts[2],                       // date
+                parts[3],                       // description
+                parts[4],                       // category
+                parts[5],                       // type
+                Double.parseDouble(parts[6])    // amount
+        );
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public double getAmount() {
+        return amount;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setDate(String date) {
+        this.date = date;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setAmount(double amount) {
+        this.amount = amount;
+    }
+}
+
+===== End of src/model/Transaction.java =====
+
+===== File: src/model/User.java =====
+import java.io.Serializable;
+
+public class User implements Serializable {
+
+    private String username;
+    private String password; // disimpan plain text untuk demo
+
+    public User(String username, String password) {
+        this.username = username;
+        this.password = password;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    // Format penyimpanan di file: username|password
+    public String toCSV() {
+        return username + "|" + password;
+    }
+
+    public static User fromCSV(String line) {
+        String[] parts = line.split("\\|");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Format user tidak valid: " + line);
+        }
+        return new User(parts[0], parts[1]);
+    }
+}
+
+===== End of src/model/User.java =====
+
+===== File: src/persistence/FileManager.java =====
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class FileManager {
+
+    private static final String FILE_NAME = "data/database_transactions.txt";
+
+    public List<Transaction> loadTransactions() {
+        List<Transaction> list = new ArrayList<>();
+        File file = new File(FILE_NAME);
+
+        if (!file.exists()) {
+            return list;
+        }
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    Transaction t = Transaction.fromCSV(line);
+                    list.add(t);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return list;
+    }
+
+    public void saveTransaction(Transaction t) {
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(FILE_NAME, true), "UTF-8"))) {
+
+            writer.write(t.toCSV());
+            writer.newLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void saveAll(List<Transaction> transactions) {
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(FILE_NAME, false), "UTF-8"))) {
+
+            for (Transaction t : transactions) {
+                writer.write(t.toCSV());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+===== End of src/persistence/FileManager.java =====
+
+===== File: src/test/TestBackend2Facade.java =====
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+public class TestBackend2Facade {
+
+    // Helper kecil untuk ambil ID transaksi pertama dari respon DATA_ALL
+    // Format: DATA_ALL|id;date;description;category;type;amount#id2;...
+    private static String extractFirstTransactionId(String dataAllResponse) {
+        if (dataAllResponse == null || !dataAllResponse.startsWith("DATA_ALL|")) {
+            return null;
+        }
+        String payload = dataAllResponse.substring("DATA_ALL|".length());
+        if (payload.isEmpty()) return null;
+
+        String firstBlock;
+        int hashIndex = payload.indexOf('#');
+        if (hashIndex >= 0) {
+            firstBlock = payload.substring(0, hashIndex);
+        } else {
+            firstBlock = payload;
+        }
+
+        int semicolonIndex = firstBlock.indexOf(';');
+        if (semicolonIndex <= 0) {
+            return null;
+        }
+        return firstBlock.substring(0, semicolonIndex);
+    }
+
+    public static void main(String[] args) {
+        Backend2Facade backend = new Backend2Facade();
+
+        System.out.println("=== TEST REGISTER ===");
+        String reg1 = backend.handleTextCommand("REGISTER|indra|12345");
+        String reg2 = backend.handleTextCommand("REGISTER|indra|12345");
+        System.out.println("RESP REG 1: " + reg1);
+        System.out.println("RESP REG 2: " + reg2);
+
+        System.out.println("\n=== TEST LOGIN ===");
+        String loginOk  = backend.handleTextCommand("LOGIN|indra|12345");
+        String loginBad = backend.handleTextCommand("LOGIN|indra|salah");
+        System.out.println("RESP LOGIN OK : " + loginOk);
+        System.out.println("RESP LOGIN BAD: " + loginBad);
+
+        System.out.println("\n=== TEST CHANGE PASSWORD ===");
+        String changeOk  = backend.handleTextCommand("CHANGE_PASSWORD|indra|12345|99999");
+        String changeBad = backend.handleTextCommand("CHANGE_PASSWORD|indra|12345|abcde");
+        System.out.println("RESP CHANGE OK : " + changeOk);
+        System.out.println("RESP CHANGE BAD: " + changeBad);
+
+        System.out.println("\n=== TEST LOGIN SETELAH GANTI PASSWORD ===");
+        String loginOld = backend.handleTextCommand("LOGIN|indra|12345");
+        String loginNew = backend.handleTextCommand("LOGIN|indra|99999");
+        System.out.println("RESP LOGIN OLD: " + loginOld);
+        System.out.println("RESP LOGIN NEW: " + loginNew);
+
+        System.out.println("\n=== TEST ADD (CREATE) & SUMMARY ===");
+        String cmd1 = "ADD|indra|2025-12-02|Gaji Bulanan|Gaji|INCOME|8500000";
+        String cmd2 = "ADD|indra|2025-12-03|Makan siang|Makanan|EXPENSE|25000";
+        String cmd3 = "ADD|indra|2025-12-04|Ngopi|Hiburan|EXPENSE|15000";
+
+        String respAdd1 = backend.handleTextCommand(cmd1);
+        String respAdd2 = backend.handleTextCommand(cmd2);
+        String respAdd3 = backend.handleTextCommand(cmd3);
+
+        System.out.println("RESP ADD 1: " + respAdd1);
+        System.out.println("RESP ADD 2: " + respAdd2);
+        System.out.println("RESP ADD 3: " + respAdd3);
+
+        System.out.println("\n=== TEST READ: GET_SUMMARY & GET_ALL ===");
+        String summaryResp = backend.handleTextCommand("GET_SUMMARY");
+        System.out.println("RESP SUMMARY: " + summaryResp);
+
+        String allDataResp = backend.handleTextCommand("GET_ALL");
+        System.out.println("RESP DATA_ALL: " + allDataResp);
+
+        String firstId = extractFirstTransactionId(allDataResp);
+        System.out.println("FIRST TRANSACTION ID (for update/delete): " + firstId);
+
+        if (firstId != null) {
+            System.out.println("\n=== TEST UPDATE TRANSACTION ===");
+            String updateCmd = "UPDATE|" + firstId +
+                    "|indra|2025-12-05|Gaji Bonus|Gaji|INCOME|5000000";
+            String respUpdate = backend.handleTextCommand(updateCmd);
+            System.out.println("RESP UPDATE: " + respUpdate);
+
+            String allAfterUpdate = backend.handleTextCommand("GET_ALL");
+            System.out.println("DATA_ALL AFTER UPDATE: " + allAfterUpdate);
+
+            System.out.println("\n=== TEST DELETE TRANSACTION ===");
+            String deleteCmd = "DELETE|" + firstId;
+            String respDelete = backend.handleTextCommand(deleteCmd);
+            System.out.println("RESP DELETE: " + respDelete);
+
+            String allAfterDelete = backend.handleTextCommand("GET_ALL");
+            System.out.println("DATA_ALL AFTER DELETE: " + allAfterDelete);
+        } else {
+            System.out.println("TIDAK ADA TRANSAKSI UNTUK DI-UPDATE / DELETE");
+        }
+
+        System.out.println("\n=== TEST REQ_REPORT & GENERATE CSV (STREAM) ===");
+        String fileSizeHeader = backend.handleTextCommand("REQ_REPORT");
+        System.out.println("RESP FILE_SIZE: " + fileSizeHeader);
+
+        byte[] reportBytes = backend.getReportBytes();
+        System.out.println("Report size (bytes): " + reportBytes.length);
+
+        try (FileOutputStream fos = new FileOutputStream("reports/report_test.csv")) {
+            fos.write(reportBytes);
+            System.out.println("File reports/report_test.csv berhasil dibuat.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("\n=== SELESAI TEST CRUD BACKEND2FACADE ===");
+    }
+}
+
+===== End of src/test/TestBackend2Facade.java =====
+
+===== File: src/test/TestFileManager.java =====
+import java.util.List;
+
+public class TestFileManager {
+    public static void main(String[] args) {
+        FileManager fm = new FileManager();
+
+        Transaction t1 = new Transaction(
+                "TXN-002",
+                "indra",
+                "2025-12-03",
+                "Makan siang",
+                "Makanan",
+                "EXPENSE",
+                25000
+        );
+        fm.saveTransaction(t1);
+        System.out.println("Satu transaksi disimpan ke file.");
+
+        List<Transaction> list = fm.loadTransactions();
+        System.out.println("Isi file sekarang:");
+        for (Transaction t : list) {
+            System.out.println(t.getDate() + " - " + t.getDescription() + " - " + t.getAmount());
+        }
+    }
+}
+
+===== End of src/test/TestFileManager.java =====
+
+===== File: src/test/TestTransaction.java =====
+public class TestTransaction {
+    public static void main(String[] args) {
+        Transaction t1 = new Transaction(
+                "TXN-001",
+                "indra",
+                "2025-12-02",
+                "Gaji Bulanan",
+                "Gaji",
+                "INCOME",
+                8500000
+        );
+
+        String line = t1.toCSV();
+        System.out.println("CSV: " + line);
+
+        Transaction t2 = Transaction.fromCSV(line);
+        System.out.println("Parsed: " + t2.getDescription() + " - " + t2.getAmount());
+    }
+}
+
+===== End of src/test/TestTransaction.java =====
+
+===== File: src/test/TestTransactionService.java =====
+import java.util.List;
+
+public class TestTransactionService {
+    public static void main(String[] args) {
+        TransactionService service = new TransactionService();
+
+        service.addTransaction("indra", "2025-12-02",
+                "Gaji Bulanan", "Gaji", "INCOME", 8500000);
+
+        service.addTransaction("indra", "2025-12-03",
+                "Makan siang", "Makanan", "EXPENSE", 25000);
+
+        FinancialSummary summary = service.getSummary();
+        System.out.println("Total Income   : " + summary.getTotalIncome());
+        System.out.println("Total Expense  : " + summary.getTotalExpense());
+        System.out.println("Total Balance  : " + summary.getTotalBalance());
+
+        String msg = service.buildAllTransactionsMessage();
+        System.out.println("DATA_ALL msg   : " + msg);
+
+        FileManager fm = new FileManager();
+        List<Transaction> list = fm.loadTransactions();
+        System.out.println("Isi file saat ini:");
+        for (Transaction t : list) {
+            System.out.println(t.getDate() + " | " + t.getDescription() + " | " + t.getAmount());
+        }
+    }
+}
+
+===== End of src/test/TestTransactionService.java =====
+
+===== File: src/service/ReportService.java =====
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+public class ReportService {
+
+    public String buildCsv(List<Transaction> transactions) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("ID,USERNAME,DATE,DESCRIPTION,CATEGORY,TYPE,AMOUNT\n");
+
+        for (Transaction t : transactions) {
+            sb.append(t.getId()).append(",")
+              .append(nullSafe(t.getUsername())).append(",")
+              .append(nullSafe(t.getDate())).append(",")
+              .append(escapeCsv(nullSafe(t.getDescription()))).append(",")
+              .append(escapeCsv(nullSafe(t.getCategory()))).append(",")
+              .append(nullSafe(t.getType())).append(",")
+              .append(t.getAmount())
+              .append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    public byte[] buildCsvBytes(List<Transaction> transactions) {
+        String csv = buildCsv(transactions);
+        return csv.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsv(String text) {
+        if (text.contains(",") || text.contains("\"") || text.contains("\n")) {
+            return "\"" + text.replace("\"", "\"\"") + "\"";
+        }
+        return text;
+    }
+
+    private String nullSafe(String text) {
+        return text == null ? "" : text;
+    }
+}
+
+===== End of src/service/ReportService.java =====
+
+===== File: src/service/TransactionService.java =====
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+public class TransactionService {
+
+    private final FileManager fileManager;
+    private final List<Transaction> transactions;
+
+    public TransactionService() {
+        this.fileManager = new FileManager();
+        this.transactions = new ArrayList<>(fileManager.loadTransactions());
+    }
+
+    // ====== CREATE ======
+
+    public synchronized Transaction addTransaction(String username, String date,
+                                                   String description, String category,
+                                                   String type, double amount) {
+
+        String id = UUID.randomUUID().toString();
+        Transaction t = new Transaction(id, username, date, description, category, type, amount);
+
+        transactions.add(t);
+        fileManager.saveTransaction(t);
+
+        return t;
+    }
+
+    // Format command: ADD|username|date|description|category|type|amount
+    public synchronized Transaction addTransactionFromCommand(String commandLine) {
+        String[] parts = commandLine.split("\\|");
+        if (parts.length != 7) {
+            throw new IllegalArgumentException("Format ADD tidak valid: " + commandLine);
+        }
+
+        String username    = parts[1];
+        String date        = parts[2];
+        String description = parts[3];
+        String category    = parts[4];
+        String type        = parts[5];
+        double amount      = Double.parseDouble(parts[6]);
+
+        return addTransaction(username, date, description, category, type, amount);
+    }
+
+    // ====== READ ======
+
+    public synchronized List<Transaction> getAllTransactions() {
+        return new ArrayList<>(transactions);
+    }
+
+    public synchronized FinancialSummary getSummary() {
+        double income = 0.0;
+        double expense = 0.0;
+
+        for (Transaction t : transactions) {
+            if ("INCOME".equalsIgnoreCase(t.getType())) {
+                income += t.getAmount();
+            } else if ("EXPENSE".equalsIgnoreCase(t.getType())) {
+                expense += t.getAmount();
+            }
+        }
+
+        return new FinancialSummary(income, expense);
+    }
+
+    // Format: DATA_ALL|id;date;description;category;type;amount#id2;...
+    public synchronized String buildAllTransactionsMessage() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("DATA_ALL|");
+
+        for (int i = 0; i < transactions.size(); i++) {
+            Transaction t = transactions.get(i);
+            sb.append(t.getId()).append(";")
+              .append(t.getDate()).append(";")
+              .append(t.getDescription()).append(";")
+              .append(t.getCategory()).append(";")
+              .append(t.getType()).append(";")
+              .append(t.getAmount());
+
+            if (i < transactions.size() - 1) {
+                sb.append("#");
+            }
+        }
+
+        return sb.toString();
+    }
+
+    // ====== UPDATE ======
+
+    // Format command: UPDATE|id|username|date|description|category|type|amount
+    public synchronized boolean updateTransactionFromCommand(String commandLine) {
+        String[] parts = commandLine.split("\\|");
+        if (parts.length != 8) {
+            throw new IllegalArgumentException("Format UPDATE tidak valid: " + commandLine);
+        }
+
+        String id          = parts[1];
+        String username    = parts[2];
+        String date        = parts[3];
+        String description = parts[4];
+        String category    = parts[5];
+        String type        = parts[6];
+        double amount      = Double.parseDouble(parts[7]);
+
+        return updateTransaction(id, username, date, description, category, type, amount);
+    }
+
+    public synchronized boolean updateTransaction(String id,
+                                                  String username,
+                                                  String date,
+                                                  String description,
+                                                  String category,
+                                                  String type,
+                                                  double amount) {
+        for (Transaction t : transactions) {
+            if (t.getId().equals(id)) {
+                t.setUsername(username);
+                t.setDate(date);
+                t.setDescription(description);
+                t.setCategory(category);
+                t.setType(type);
+                t.setAmount(amount);
+
+                fileManager.saveAll(transactions);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ====== DELETE ======
+
+    // Format command: DELETE|id
+    public synchronized boolean deleteTransactionFromCommand(String commandLine) {
+        String[] parts = commandLine.split("\\|");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("Format DELETE tidak valid: " + commandLine);
+        }
+        String id = parts[1];
+        return deleteTransaction(id);
+    }
+
+    public synchronized boolean deleteTransaction(String id) {
+        boolean removed = transactions.removeIf(t -> t.getId().equals(id));
+        if (removed) {
+            fileManager.saveAll(transactions);
+        }
+        return removed;
+    }
+}
+
+===== End of src/service/TransactionService.java =====
+
+===== File: src/service/UserManager.java =====
+import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class UserManager {
+
+    private static final String FILE_NAME = "data/users.txt";
+
+    private final Map<String, User> users = new HashMap<>();
+
+    public UserManager() {
+        loadUsersFromFile();
+    }
+
+    private void loadUsersFromFile() {
+        File file = new File(FILE_NAME);
+        if (!file.exists()) {
+            return;
+        }
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    User u = User.fromCSV(line);
+                    users.put(u.getUsername(), u);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ====== CREATE ======
+
+    public synchronized boolean registerUser(String username, String password) {
+        if (users.containsKey(username)) {
+            return false;
+        }
+
+        User u = new User(username, password);
+        users.put(username, u);
+
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(FILE_NAME, true), "UTF-8"))) {
+
+            writer.write(u.toCSV());
+            writer.newLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return true;
+    }
+
+    // ====== READ ======
+
+    public synchronized boolean validateLogin(String username, String password) {
+        User u = users.get(username);
+        if (u == null) return false;
+        return u.getPassword().equals(password);
+    }
+
+    public synchronized User getUser(String username) {
+        return users.get(username);
+    }
+
+    // ====== UPDATE ======
+
+    public synchronized boolean changePassword(String username,
+                                               String oldPassword,
+                                               String newPassword) {
+        User u = users.get(username);
+        if (u == null) {
+            return false;
+        }
+        if (!u.getPassword().equals(oldPassword)) {
+            return false;
+        }
+
+        User updated = new User(username, newPassword);
+        users.put(username, updated);
+
+        saveAllUsersToFile();
+        return true;
+    }
+
+    private void saveAllUsersToFile() {
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(FILE_NAME, false), "UTF-8"))) {
+
+            for (User u : users.values()) {
+                writer.write(u.toCSV());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+===== End of src/service/UserManager.java =====
