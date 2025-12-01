@@ -47,7 +47,8 @@ public class TestSocketClient {
                     int remaining = size;
                     while (remaining > 0) {
                         int read = raw.read(buf, 0, Math.min(buf.length, remaining));
-                        if (read == -1) break;
+                        if (read == -1)
+                            break;
                         fos.write(buf, 0, read);
                         remaining -= read;
                     }
