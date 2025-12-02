@@ -54,16 +54,24 @@ public class ClientHandler implements Runnable {
     private void handle(String msg) {
         RequestLogger logger = RequestLogger.getInstance();
         String command = msg.split("\\|")[0];
-        
+
         try {
             // Log incoming request
             logger.logRequest(msg, username.isEmpty() ? "ANONYMOUS" : username);
-            
-            // Handle simplified LOGIN without password for FE handshake
-            if (msg.startsWith("LOGIN|") && msg.split("\\|").length == 2) {
-                username = msg.substring("LOGIN|".length());
-                send("LOGIN_OK|Selamat datang " + username);
-                logger.logSuccess(command, "User logged in: " + username);
+
+            // SUBSCRIBE|sessionToken -> register this handler to user updates
+            if (msg.startsWith("SUBSCRIBE|") && msg.split("\\|").length == 2) {
+                String token = msg.substring("SUBSCRIBE|".length());
+                String resolvedUser = facade.getUsernameForSession(token);
+                if (resolvedUser != null) {
+                    this.username = resolvedUser;
+                    server.subscribe(resolvedUser, this);
+                    send("SUBSCRIBED|" + resolvedUser);
+                    logger.logSuccess(command, "Subscribed: " + resolvedUser);
+                } else {
+                    send("ERROR|SESSION_INVALID");
+                    logger.logError(command, "Subscribe failed: invalid session");
+                }
                 return;
             }
 
@@ -71,11 +79,11 @@ public class ClientHandler implements Runnable {
             String response = facade.handleTextCommand(msg);
             if (response != null && !response.isEmpty()) {
                 send(response);
-                
+
                 // Log response status
-                if (response.startsWith("OK") || response.startsWith("LOGIN_OK") || 
-                    response.startsWith("SUMMARY") || response.startsWith("DATA_ALL") ||
-                    response.startsWith("FILE_SIZE")) {
+                if (response.startsWith("OK") || response.startsWith("LOGIN_OK") ||
+                        response.startsWith("SUMMARY") || response.startsWith("DATA_ALL") ||
+                        response.startsWith("FILE_SIZE")) {
                     logger.logSuccess(command, "Response: " + response.substring(0, Math.min(100, response.length())));
                 } else if (response.startsWith("ERROR")) {
                     logger.logError(command, response);
@@ -95,12 +103,21 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            // Trigger broadcasts on data-changing commands
-            if (msg.startsWith("ADD|") || msg.startsWith("UPDATE|") || msg.startsWith("DELETE|")) {
-                server.broadcast("REFRESH_TABLE");
-                String summary = facade.handleTextCommand("GET_SUMMARY");
-                server.broadcast(summary);
-                logger.logInfo(command, "Broadcast triggered for data change");
+            // Trigger per-user event broadcasts on data-changing commands to subscribers
+            if (msg.startsWith("ADD|") || msg.startsWith("UPDATE|") || msg.startsWith("DELETE|") ||
+                    msg.startsWith("ADD_ACCOUNT|") || msg.startsWith("UPDATE_ACCOUNT|")
+                    || msg.startsWith("DELETE_ACCOUNT|") ||
+                    msg.startsWith("ADD_CATEGORY|") || msg.startsWith("DELETE_CATEGORY|")) {
+                // Resolve username from session token (2nd field)
+                String[] parts = msg.split("\\|");
+                if (parts.length >= 2) {
+                    String token = parts[1];
+                    String user = facade.getUsernameForSession(token);
+                    if (user != null) {
+                        // Lightweight event; clients will fetch fresh state
+                        server.sendToUser(user, "EVENT|DATA_CHANGED");
+                    }
+                }
             }
         } catch (Exception e) {
             send("ERROR|" + e.getMessage());

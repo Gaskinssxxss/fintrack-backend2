@@ -13,13 +13,20 @@ public class UserManager {
 
     public UserManager() {
         loadUsersFromFile();
+        System.out.println("[UserManager] Loaded " + users.size() + " users");
+        for (String username : users.keySet()) {
+            System.out.println("[UserManager]   - " + username);
+        }
     }
 
     private void loadUsersFromFile() {
         File file = new File(FILE_NAME);
         if (!file.exists()) {
+            System.out.println("[UserManager] Users file not found: " + file.getAbsolutePath());
             return;
         }
+
+        System.out.println("[UserManager] Loading users from: " + file.getAbsolutePath());
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
@@ -32,6 +39,7 @@ public class UserManager {
                 }
             }
         } catch (IOException e) {
+            System.err.println("[UserManager] Error loading users: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -61,9 +69,15 @@ public class UserManager {
     // ====== READ ======
 
     public synchronized boolean validateLogin(String username, String password) {
+        System.out.println("[UserManager] validateLogin: username='" + username + "', password='" + password + "'");
         User u = users.get(username);
-        if (u == null) return false;
-        return u.getPassword().equals(password);
+        if (u == null) {
+            System.out.println("[UserManager] User not found: " + username);
+            return false;
+        }
+        boolean matches = u.getPassword().equals(password);
+        System.out.println("[UserManager] Password match: " + matches + " (expected: '" + u.getPassword() + "')");
+        return matches;
     }
 
     public synchronized User getUser(String username) {
@@ -73,8 +87,8 @@ public class UserManager {
     // ====== UPDATE ======
 
     public synchronized boolean changePassword(String username,
-                                               String oldPassword,
-                                               String newPassword) {
+            String oldPassword,
+            String newPassword) {
         User u = users.get(username);
         if (u == null) {
             return false;

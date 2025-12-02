@@ -11,13 +11,15 @@ public class Account implements Serializable {
     public static final String TYPE_CREDIT = "Kredit";
 
     private String id;          // UUID
+    private String username;    // Username pemilik akun
     private String name;        // Nama akun (e.g., "BCA Savings")
     private String number;      // Nomor akun (e.g., "1234567890")
     private long balance;       // Saldo (dalam satuan terkecil, e.g., rupiah)
     private String type;        // TYPE_BANK, TYPE_WALLET, TYPE_CASH, TYPE_CREDIT
 
-    public Account(String id, String name, String number, long balance, String type) {
+    public Account(String id, String username, String name, String number, long balance, String type) {
         this.id = id;
+        this.username = username;
         this.name = name;
         this.number = number;
         this.balance = balance;
@@ -26,27 +28,44 @@ public class Account implements Serializable {
 
     // Dipakai saat simpan ke file (Stream)
     public String toCSV() {
-        return id + "|" + name + "|" + number + "|" + balance + "|" + type;
+        return id + "|" + username + "|" + name + "|" + number + "|" + balance + "|" + type;
     }
 
     // Dipakai saat baca dari file
     public static Account fromCSV(String line) {
         String[] parts = line.split("\\|");
-        if (parts.length != 5) {
+        if (parts.length == 5) {
+            // Old format without username - migrate to new format with empty username
+            return new Account(
+                    parts[0],                       // id
+                    "",                             // username (empty for migrated data)
+                    parts[1],                       // name
+                    parts[2],                       // number
+                    Long.parseLong(parts[3]),       // balance
+                    parts[4]                        // type
+            );
+        } else if (parts.length == 6) {
+            // New format with username
+            return new Account(
+                    parts[0],                       // id
+                    parts[1],                       // username
+                    parts[2],                       // name
+                    parts[3],                       // number
+                    Long.parseLong(parts[4]),       // balance
+                    parts[5]                        // type
+            );
+        } else {
             throw new IllegalArgumentException("Format data tidak valid: " + line);
         }
-        return new Account(
-                parts[0],                       // id
-                parts[1],                       // name
-                parts[2],                       // number
-                Long.parseLong(parts[3]),       // balance
-                parts[4]                        // type
-        );
     }
 
     // Getters
     public String getId() {
         return id;
+    }
+
+    public String getUsername() {
+        return username;
     }
 
     public String getName() {

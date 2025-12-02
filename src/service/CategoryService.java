@@ -27,9 +27,10 @@ public class CategoryService {
 
     /**
      * Add a new category
+     * @param username the username of the category owner
      */
-    public synchronized void addCategory(String type, String name) {
-        Category category = new Category(type, name);
+    public synchronized void addCategory(String username, String type, String name) {
+        Category category = new Category(username, type, name);
         categories.add(category);
         fileManager.saveCategories(categories);
     }
@@ -43,13 +44,32 @@ public class CategoryService {
     }
 
     /**
-     * Delete a category by type and name
+     * Get categories for a specific user
+     * Includes both user-specific categories and system default categories (empty username)
+     * @param username the username to filter by
+     * @return list of categories belonging to the user
+     */
+    public synchronized List<Category> getCategoriesByUsername(String username) {
+        List<Category> userCategories = new ArrayList<>();
+        for (Category category : categories) {
+            // Include categories that belong to the user OR are system defaults (empty username)
+            if (category.getUsername().equals(username) || category.getUsername().isEmpty()) {
+                userCategories.add(category);
+            }
+        }
+        return userCategories;
+    }
+
+    /**
+     * Delete a category by username, type and name
      * @return true if category was found and deleted, false otherwise
      */
-    public synchronized boolean deleteCategory(String type, String name) {
+    public synchronized boolean deleteCategory(String username, String type, String name) {
         for (int i = 0; i < categories.size(); i++) {
             Category cat = categories.get(i);
-            if (cat.getType().equals(type) && cat.getName().equals(name)) {
+            if (cat.getUsername().equals(username) && 
+                cat.getType().equals(type) && 
+                cat.getName().equals(name)) {
                 categories.remove(i);
                 fileManager.saveCategories(categories);
                 return true;

@@ -9,7 +9,7 @@ public class FileManager {
 
     private static final String FILE_NAME = "data/database_transactions.txt";
 
-    public List<Transaction> loadTransactions() {
+    public synchronized List<Transaction> loadTransactions() {
         List<Transaction> list = new ArrayList<>();
         File file = new File(FILE_NAME);
 
@@ -34,7 +34,7 @@ public class FileManager {
         return list;
     }
 
-    public void saveTransaction(Transaction t) {
+    public synchronized void saveTransaction(Transaction t) {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(FILE_NAME, true), "UTF-8"))) {
 
@@ -45,7 +45,7 @@ public class FileManager {
         }
     }
 
-    public void saveAll(List<Transaction> transactions) {
+    public synchronized void saveAll(List<Transaction> transactions) {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(FILE_NAME, false), "UTF-8"))) {
 

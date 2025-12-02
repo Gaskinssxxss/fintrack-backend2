@@ -1,2 +1,0 @@
-id1|user1|2025-11-18|Lunch|Food|EXPENSE|50000
-id2|user1|2025-11-18|Salary|Income|INCOME|5000000|BCA|Bank

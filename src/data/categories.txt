@@ -1,17 +1,2 @@
-Pengeluaran|Belanja
-Pengeluaran|Hiburan
-Pengeluaran|Tagihan
-Pengeluaran|Kesehatan
-Pengeluaran|Pendidikan
-Pengeluaran|Lainnya
-Pemasukan|Gaji
-Pemasukan|Freelance
-Pemasukan|Investasi
-Pemasukan|Bonus
-Pemasukan|Lainnya
-Pengeluaran|Makanan & Minuman
-Pengeluaran|Makanan & Minuman
-Pengeluaran|Transportasi
-Pemasukan|Gaji
-Pemasukan|Freelance
-Pengeluaran|Coffee
+aldi|Pengeluaran|MK
+aldi|Pemasukan|Giveaway

@@ -22,20 +22,21 @@ public class Backend2Facade {
     private final SessionManager sessionManager;
 
     public Backend2Facade() {
-        this.transactionService = new TransactionService();
+        this.accountService = new AccountService();
+        this.transactionService = new TransactionService(accountService);
         this.reportService = new ReportService();
         this.userManager = new UserManager();
-        this.accountService = new AccountService();
         this.categoryService = new CategoryService();
         this.sessionManager = new SessionManager();
     }
 
     // ====== API TEXT-BASED UNTUK BACKEND 1 (via string command) ======
-    
+
     /**
      * Handle text-based commands from clients.
      * 
-     * BREAKING CHANGE: All authenticated commands now require a session token as the first parameter.
+     * BREAKING CHANGE: All authenticated commands now require a session token as
+     * the first parameter.
      * 
      * UNAUTHENTICATED COMMANDS (no session token required):
      * - REGISTER|username|password
@@ -43,13 +44,16 @@ public class Backend2Facade {
      * 
      * SESSION MANAGEMENT COMMANDS:
      * - LOGOUT|sessionToken -> Returns: OK
-     * - VALIDATE_SESSION|sessionToken -> Returns: OK|username or ERROR|SESSION_INVALID
+     * - VALIDATE_SESSION|sessionToken -> Returns: OK|username or
+     * ERROR|SESSION_INVALID
      * 
      * AUTHENTICATED COMMANDS (require session token as first parameter):
      * 
      * Transaction Commands:
-     * - ADD|sessionToken|date|description|category|type|amount|accountName|accountType
-     * - UPDATE|sessionToken|id|date|description|category|type|amount|accountName|accountType
+     * -
+     * ADD|sessionToken|date|description|category|type|amount|accountName|accountType
+     * -
+     * UPDATE|sessionToken|id|date|description|category|type|amount|accountName|accountType
      * - DELETE|sessionToken|id
      * - GET_ALL|sessionToken
      * - GET_SUMMARY|sessionToken
@@ -106,17 +110,25 @@ public class Backend2Facade {
         if (line.startsWith("LOGIN|")) {
             String[] parts = line.split("\\|");
             if (parts.length != 3) {
+                System.out.println("[Backend2Facade] LOGIN: Invalid format, parts.length=" + parts.length);
                 return "ERROR|LOGIN_FORMAT";
             }
             String username = parts[1];
             String password = parts[2];
 
+            System.out.println(
+                    "[Backend2Facade] LOGIN attempt: username='" + username + "', password='" + password + "'");
+
             boolean valid = userManager.validateLogin(username, password);
+            System.out.println("[Backend2Facade] Login validation result: " + valid);
+
             if (valid) {
                 // Create session and return session token
                 String sessionToken = sessionManager.createSession(username);
+                System.out.println("[Backend2Facade] Login successful, token=" + sessionToken);
                 return "OK|" + sessionToken;
             } else {
+                System.out.println("[Backend2Facade] Login failed for username: " + username);
                 return "LOGIN_FAIL|INVALID_CREDENTIALS";
             }
         }
@@ -130,7 +142,7 @@ public class Backend2Facade {
                 return "ERROR|LOGOUT_FORMAT";
             }
             String sessionToken = parts[1];
-            
+
             sessionManager.removeSession(sessionToken);
             return "OK";
         }
@@ -144,7 +156,7 @@ public class Backend2Facade {
                 return "ERROR|VALIDATE_SESSION_FORMAT";
             }
             String sessionToken = parts[1];
-            
+
             if (sessionManager.validateSession(sessionToken)) {
                 String username = sessionManager.getUsernameFromSession(sessionToken);
                 return "OK|" + username;
@@ -160,14 +172,14 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 4) {
                 return "ERROR|CHANGE_PASSWORD_FORMAT";
             }
@@ -183,59 +195,74 @@ public class Backend2Facade {
         }
 
         // --- ADD transaksi ---
-        // Format: ADD|sessionToken|date|description|category|type|amount|accountName|accountType
-        // Also supports old format: ADD|sessionToken|date|description|category|type|amount (backward compatibility)
+        // Format:
+        // ADD|sessionToken|date|description|category|type|amount|accountName|accountType
+        // Also supports old format:
+        // ADD|sessionToken|date|description|category|type|amount (backward
+        // compatibility)
         if (line.startsWith("ADD|")) {
             String[] parts = line.split("\\|");
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             // Reconstruct command with username instead of sessionToken
             StringBuilder reconstructed = new StringBuilder("ADD|" + username);
             for (int i = 2; i < parts.length; i++) {
                 reconstructed.append("|").append(parts[i]);
             }
-            
+
             transactionService.addTransactionFromCommand(reconstructed.toString());
             FinancialSummary summary = transactionService.getSummary();
             return summary.toProtocolString(); // SUMMARY|...
         }
 
         // --- UPDATE transaksi ---
-        // Format: UPDATE|sessionToken|id|date|description|category|type|amount|accountName|accountType
-        // Also supports old format: UPDATE|sessionToken|id|date|description|category|type|amount (backward compatibility)
+        // Format:
+        // UPDATE|sessionToken|id|date|description|category|type|amount|accountName|accountType
+        // Also supports old format:
+        // UPDATE|sessionToken|id|date|description|category|type|amount (backward
+        // compatibility)
         if (line.startsWith("UPDATE|")) {
             String[] parts = line.split("\\|");
+            System.out.println("[Backend2Facade] UPDATE request received, parts.length=" + parts.length);
+
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
+            System.out.println("[Backend2Facade] UPDATE: sessionToken=" + sessionToken + ", username=" + username);
+
             if (username == null) {
+                System.out.println("[Backend2Facade] UPDATE: Session invalid");
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             // Reconstruct command with username: UPDATE|id|username|date|...
             if (parts.length < 3) {
                 return "ERROR|INVALID_FORMAT|UPDATE requires id and other fields";
             }
-            
+
             StringBuilder reconstructed = new StringBuilder("UPDATE|" + parts[2] + "|" + username);
             for (int i = 3; i < parts.length; i++) {
                 reconstructed.append("|").append(parts[i]);
             }
-            
+
+            System.out.println("[Backend2Facade] UPDATE: reconstructed command=" + reconstructed.toString());
+
             boolean updated = transactionService.updateTransactionFromCommand(reconstructed.toString());
+            System.out.println("[Backend2Facade] UPDATE: result=" + updated);
+
             if (updated) {
                 FinancialSummary summary = transactionService.getSummary();
                 return summary.toProtocolString();
@@ -248,30 +275,86 @@ public class Backend2Facade {
         // Format: DELETE|sessionToken|id
         if (line.startsWith("DELETE|")) {
             String[] parts = line.split("\\|");
+            System.out.println("[Backend2Facade] DELETE request received, parts.length=" + parts.length);
+
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
+            System.out.println("[Backend2Facade] DELETE: sessionToken=" + sessionToken + ", username=" + username);
+
             if (username == null) {
+                System.out.println("[Backend2Facade] DELETE: Session invalid");
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             // Reconstruct command: DELETE|id
             if (parts.length < 3) {
                 return "ERROR|INVALID_FORMAT|DELETE requires id";
             }
-            
+
             String reconstructed = "DELETE|" + parts[2];
-            
+            System.out.println("[Backend2Facade] DELETE: reconstructed command=" + reconstructed);
+
             boolean deleted = transactionService.deleteTransactionFromCommand(reconstructed);
+            System.out.println("[Backend2Facade] DELETE: result=" + deleted);
+
             if (deleted) {
                 FinancialSummary summary = transactionService.getSummary();
                 return summary.toProtocolString();
             } else {
                 return "ERROR|DELETE_NOT_FOUND";
+            }
+        }
+
+        // --- GET_ALL transaksi ---
+        // Format: GET_ALL|sessionToken
+        // Returns:
+        // DATA_ALL|count|id1|username1|date1|desc1|cat1|type1|amount1|accName1|accType1|...
+        if (line.startsWith("GET_ALL|") || line.equals("GET_ALL")) {
+            String[] parts = line.split("\\|");
+            if (parts.length < 2) {
+                return "ERROR|SESSION_REQUIRED";
+            }
+
+            String sessionToken = parts[1];
+            String username = validateAndGetUsername(sessionToken);
+
+            if (username == null) {
+                return "ERROR|SESSION_INVALID";
+            }
+
+            try {
+                List<Transaction> allTransactions = transactionService.getAllTransactions();
+                // Filter transactions by username
+                List<Transaction> userTransactions = new java.util.ArrayList<>();
+                for (Transaction t : allTransactions) {
+                    if (t.getUsername().equals(username)) {
+                        userTransactions.add(t);
+                    }
+                }
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("DATA_ALL|").append(userTransactions.size());
+
+                for (Transaction t : userTransactions) {
+                    sb.append("|").append(t.getId())
+                            .append("|").append(t.getUsername())
+                            .append("|").append(t.getDate())
+                            .append("|").append(t.getDescription())
+                            .append("|").append(t.getCategory())
+                            .append("|").append(t.getType())
+                            .append("|").append(t.getAmount())
+                            .append("|").append(t.getAccountName() != null ? t.getAccountName() : "-")
+                            .append("|").append(t.getAccountType() != null ? t.getAccountType() : "-");
+                }
+
+                return sb.toString();
+            } catch (Exception e) {
+                return "ERROR|GET_ALL_FAILED|" + e.getMessage();
             }
         }
 
@@ -282,14 +365,14 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 6) {
                 return "ERROR|INVALID_FORMAT|ADD_ACCOUNT requires sessionToken|name|number|balance|type";
             }
@@ -298,8 +381,8 @@ public class Backend2Facade {
                 String number = parts[3];
                 long balance = Long.parseLong(parts[4]);
                 String type = parts[5];
-                
-                String accountId = accountService.addAccount(name, number, balance, type);
+
+                String accountId = accountService.addAccount(username, name, number, balance, type);
                 return "OK|" + accountId;
             } catch (NumberFormatException e) {
                 return "ERROR|INVALID_AMOUNT|Balance must be a valid long integer";
@@ -311,32 +394,33 @@ public class Backend2Facade {
         // --- GET_ACCOUNTS ---
         // Format: GET_ACCOUNTS|sessionToken
         // Returns: DATA_ACCOUNTS|count|id1|name1|number1|balance1|type1|id2|...
-        if (line.startsWith("GET_ACCOUNTS")) {
+        if (line.startsWith("GET_ACCOUNTS|") || line.equals("GET_ACCOUNTS")) {
             String[] parts = line.split("\\|");
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             try {
-                List<Account> accounts = accountService.getAllAccounts();
+                // Filter accounts by username
+                List<Account> accounts = accountService.getAccountsByUsername(username);
                 StringBuilder sb = new StringBuilder();
                 sb.append("DATA_ACCOUNTS|").append(accounts.size());
-                
+
                 for (Account account : accounts) {
                     sb.append("|").append(account.getId())
-                      .append("|").append(account.getName())
-                      .append("|").append(account.getNumber())
-                      .append("|").append(account.getBalance())
-                      .append("|").append(account.getType());
+                            .append("|").append(account.getName())
+                            .append("|").append(account.getNumber())
+                            .append("|").append(account.getBalance())
+                            .append("|").append(account.getType());
                 }
-                
+
                 return sb.toString();
             } catch (Exception e) {
                 return "ERROR|GET_ACCOUNTS_FAILED|" + e.getMessage();
@@ -350,14 +434,14 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 7) {
                 return "ERROR|INVALID_FORMAT|UPDATE_ACCOUNT requires sessionToken|id|name|number|balance|type";
             }
@@ -367,8 +451,8 @@ public class Backend2Facade {
                 String number = parts[4];
                 long balance = Long.parseLong(parts[5]);
                 String type = parts[6];
-                
-                boolean updated = accountService.updateAccount(id, name, number, balance, type);
+
+                boolean updated = accountService.updateAccount(id, username, name, number, balance, type);
                 if (updated) {
                     return "OK";
                 } else {
@@ -388,14 +472,14 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 3) {
                 return "ERROR|INVALID_FORMAT|DELETE_ACCOUNT requires sessionToken|id";
             }
@@ -419,22 +503,22 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 4) {
                 return "ERROR|INVALID_FORMAT|ADD_CATEGORY requires sessionToken|type|name";
             }
             try {
                 String type = parts[2];
                 String name = parts[3];
-                
-                categoryService.addCategory(type, name);
+
+                categoryService.addCategory(username, type, name);
                 return "OK";
             } catch (Exception e) {
                 return "ERROR|ADD_CATEGORY_FAILED|" + e.getMessage();
@@ -444,29 +528,30 @@ public class Backend2Facade {
         // --- GET_CATEGORIES ---
         // Format: GET_CATEGORIES|sessionToken
         // Returns: DATA_CATEGORIES|count|type1|name1|type2|name2|...
-        if (line.startsWith("GET_CATEGORIES")) {
+        if (line.startsWith("GET_CATEGORIES|") || line.equals("GET_CATEGORIES")) {
             String[] parts = line.split("\\|");
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             try {
-                List<Category> categories = categoryService.getAllCategories();
+                // Filter categories by username
+                List<Category> categories = categoryService.getCategoriesByUsername(username);
                 StringBuilder sb = new StringBuilder();
                 sb.append("DATA_CATEGORIES|").append(categories.size());
-                
+
                 for (Category category : categories) {
                     sb.append("|").append(category.getType())
-                      .append("|").append(category.getName());
+                            .append("|").append(category.getName());
                 }
-                
+
                 return sb.toString();
             } catch (Exception e) {
                 return "ERROR|GET_CATEGORIES_FAILED|" + e.getMessage();
@@ -480,22 +565,22 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 4) {
                 return "ERROR|INVALID_FORMAT|DELETE_CATEGORY requires sessionToken|type|name";
             }
             try {
                 String type = parts[2];
                 String name = parts[3];
-                
-                boolean deleted = categoryService.deleteCategory(type, name);
+
+                boolean deleted = categoryService.deleteCategory(username, type, name);
                 if (deleted) {
                     return "OK";
                 } else {
@@ -506,24 +591,6 @@ public class Backend2Facade {
             }
         }
 
-        // --- GET_ALL transaksi ---
-        // Format: GET_ALL|sessionToken
-        if (line.startsWith("GET_ALL")) {
-            String[] parts = line.split("\\|");
-            if (parts.length < 2) {
-                return "ERROR|SESSION_REQUIRED";
-            }
-            
-            String sessionToken = parts[1];
-            String username = validateAndGetUsername(sessionToken);
-            
-            if (username == null) {
-                return "ERROR|SESSION_INVALID";
-            }
-            
-            return transactionService.buildAllTransactionsMessage();
-        }
-
         // --- GET_SUMMARY untuk dashboard ---
         // Format: GET_SUMMARY|sessionToken
         if (line.startsWith("GET_SUMMARY")) {
@@ -531,15 +598,16 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
-            FinancialSummary summary = transactionService.getSummary();
+
+            // Calculate summary for this user only
+            FinancialSummary summary = transactionService.getSummaryForUser(username);
             return summary.toProtocolString();
         }
 
@@ -551,20 +619,20 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 3) {
                 return "ERROR|INVALID_FORMAT|GET_MONTHLY_SUMMARY requires sessionToken|yearMonth";
             }
             try {
                 String yearMonth = parts[2];
-                
+
                 return transactionService.getMonthlySummary(username, yearMonth);
             } catch (Exception e) {
                 return "ERROR|GET_MONTHLY_SUMMARY_FAILED|" + e.getMessage();
@@ -579,20 +647,20 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 3) {
                 return "ERROR|INVALID_FORMAT|GET_CATEGORY_BREAKDOWN requires sessionToken|yearMonth";
             }
             try {
                 String yearMonth = parts[2];
-                
+
                 return transactionService.getCategoryBreakdown(username, yearMonth);
             } catch (Exception e) {
                 return "ERROR|GET_CATEGORY_BREAKDOWN_FAILED|" + e.getMessage();
@@ -607,22 +675,23 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             if (parts.length != 5) {
-                return "ERROR|INVALID_FORMAT|FILTER_TRANSACTIONS requires sessionToken|date|category|account (got " + parts.length + " parts)";
+                return "ERROR|INVALID_FORMAT|FILTER_TRANSACTIONS requires sessionToken|date|category|account (got "
+                        + parts.length + " parts)";
             }
             try {
                 String date = parts[2];
                 String category = parts[3];
                 String account = parts[4];
-                
+
                 return transactionService.filterTransactions(date, category, account);
             } catch (Exception e) {
                 return "ERROR|FILTER_TRANSACTIONS_FAILED|" + e.getMessage();
@@ -636,14 +705,14 @@ public class Backend2Facade {
             if (parts.length < 2) {
                 return "ERROR|SESSION_REQUIRED";
             }
-            
+
             String sessionToken = parts[1];
             String username = validateAndGetUsername(sessionToken);
-            
+
             if (username == null) {
                 return "ERROR|SESSION_INVALID";
             }
-            
+
             byte[] report = getReportBytes();
             int size = report.length;
             return "FILE_SIZE|" + size;
@@ -667,6 +736,7 @@ public class Backend2Facade {
 
     /**
      * Helper method to validate session token and return username
+     * 
      * @param sessionToken The session token to validate
      * @return Username if valid, null if invalid or expired
      */
@@ -674,16 +744,22 @@ public class Backend2Facade {
         if (sessionToken == null || sessionToken.trim().isEmpty()) {
             return null;
         }
-        
+
         if (sessionManager.validateSession(sessionToken)) {
             sessionManager.updateLastAccessed(sessionToken);
             return sessionManager.getUsernameFromSession(sessionToken);
         }
-        
+
         return null;
     }
 
     public TransactionService getTransactionService() {
         return transactionService;
+    }
+
+    // Expose username resolution for session token (used by ClientHandler for
+    // SUBSCRIBE)
+    public String getUsernameForSession(String sessionToken) {
+        return validateAndGetUsername(sessionToken);
     }
 }

@@ -70,22 +70,26 @@ public class CategoryFileManager {
     private List<Category> getDefaultCategories() {
         List<Category> defaults = new ArrayList<>();
         
+        // Default categories with empty username (system defaults)
+        // These will be available to all users
+        String systemUser = "";
+        
         // Default expense categories
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Makanan & Minuman"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Transportasi"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Belanja"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Hiburan"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Tagihan"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Kesehatan"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Pendidikan"));
-        defaults.add(new Category(Category.TYPE_EXPENSE, "Lainnya"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Makanan & Minuman"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Transportasi"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Belanja"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Hiburan"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Tagihan"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Kesehatan"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Pendidikan"));
+        defaults.add(new Category(systemUser, Category.TYPE_EXPENSE, "Lainnya"));
         
         // Default income categories
-        defaults.add(new Category(Category.TYPE_INCOME, "Gaji"));
-        defaults.add(new Category(Category.TYPE_INCOME, "Freelance"));
-        defaults.add(new Category(Category.TYPE_INCOME, "Investasi"));
-        defaults.add(new Category(Category.TYPE_INCOME, "Bonus"));
-        defaults.add(new Category(Category.TYPE_INCOME, "Lainnya"));
+        defaults.add(new Category(systemUser, Category.TYPE_INCOME, "Gaji"));
+        defaults.add(new Category(systemUser, Category.TYPE_INCOME, "Freelance"));
+        defaults.add(new Category(systemUser, Category.TYPE_INCOME, "Investasi"));
+        defaults.add(new Category(systemUser, Category.TYPE_INCOME, "Bonus"));
+        defaults.add(new Category(systemUser, Category.TYPE_INCOME, "Lainnya"));
         
         return defaults;
     }

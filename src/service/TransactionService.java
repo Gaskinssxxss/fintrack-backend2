@@ -11,43 +11,54 @@ public class TransactionService {
 
     private final FileManager fileManager;
     private final List<Transaction> transactions;
+    private final AccountService accountService;
 
-    public TransactionService() {
+    public TransactionService(AccountService accountService) {
         this.fileManager = new FileManager();
         this.transactions = new ArrayList<>(fileManager.loadTransactions());
+        this.accountService = accountService;
     }
 
     // ====== CREATE ======
 
     public synchronized Transaction addTransaction(String username, String date,
-                                                   String description, String category,
-                                                   String type, long amount,
-                                                   String accountName, String accountType) {
+            String description, String category,
+            String type, long amount,
+            String accountName, String accountType) {
 
         String id = UUID.randomUUID().toString();
-        Transaction t = new Transaction(id, username, date, description, category, type, amount, accountName, accountType);
+        Transaction t = new Transaction(id, username, date, description, category, type, amount, accountName,
+                accountType);
 
         transactions.add(t);
         fileManager.saveTransaction(t);
 
+        // Update account balance
+        if (accountService != null && !accountName.equals("-")) {
+            long delta = "INCOME".equalsIgnoreCase(type) ? amount : -amount;
+            accountService.adjustBalance(username, accountName, accountType, delta);
+        }
+
         return t;
     }
 
-    // Format command: ADD|username|date|description|category|type|amount|accountName|accountType
-    // Also supports old format: ADD|username|date|description|category|type|amount (backward compatibility)
+    // Format command:
+    // ADD|username|date|description|category|type|amount|accountName|accountType
+    // Also supports old format: ADD|username|date|description|category|type|amount
+    // (backward compatibility)
     public synchronized Transaction addTransactionFromCommand(String commandLine) {
         String[] parts = commandLine.split("\\|");
         if (parts.length != 7 && parts.length != 9) {
             throw new IllegalArgumentException("Format ADD tidak valid: " + commandLine);
         }
 
-        String username    = parts[1];
-        String date        = parts[2];
+        String username = parts[1];
+        String date = parts[2];
         String description = parts[3];
-        String category    = parts[4];
-        String type        = parts[5];
-        long amount        = (long) Double.parseDouble(parts[6]);
-        
+        String category = parts[4];
+        String type = parts[5];
+        long amount = (long) Double.parseDouble(parts[6]);
+
         // Support backward compatibility with old format
         String accountName = (parts.length == 9) ? parts[7] : "-";
         String accountType = (parts.length == 9) ? parts[8] : "-";
@@ -76,7 +87,31 @@ public class TransactionService {
         return new FinancialSummary(income, expense);
     }
 
-    // Format: DATA_ALL|id;date;description;category;type;amount;accountName;accountType#id2;...
+    /**
+     * Get financial summary for a specific user only.
+     * 
+     * @param username The username to filter by
+     * @return FinancialSummary for the user
+     */
+    public synchronized FinancialSummary getSummaryForUser(String username) {
+        long income = 0;
+        long expense = 0;
+
+        for (Transaction t : transactions) {
+            if (t.getUsername().equals(username)) {
+                if ("INCOME".equalsIgnoreCase(t.getType())) {
+                    income += t.getAmount();
+                } else if ("EXPENSE".equalsIgnoreCase(t.getType())) {
+                    expense += t.getAmount();
+                }
+            }
+        }
+
+        return new FinancialSummary(income, expense);
+    }
+
+    // Format:
+    // DATA_ALL|id;date;description;category;type;amount;accountName;accountType#id2;...
     public synchronized String buildAllTransactionsMessage() {
         StringBuilder sb = new StringBuilder();
         sb.append("DATA_ALL|");
@@ -84,13 +119,13 @@ public class TransactionService {
         for (int i = 0; i < transactions.size(); i++) {
             Transaction t = transactions.get(i);
             sb.append(t.getId()).append(";")
-              .append(t.getDate()).append(";")
-              .append(t.getDescription()).append(";")
-              .append(t.getCategory()).append(";")
-              .append(t.getType()).append(";")
-              .append(t.getAmount()).append(";")
-              .append(t.getAccountName()).append(";")
-              .append(t.getAccountType());
+                    .append(t.getDate()).append(";")
+                    .append(t.getDescription()).append(";")
+                    .append(t.getCategory()).append(";")
+                    .append(t.getType()).append(";")
+                    .append(t.getAmount()).append(";")
+                    .append(t.getAccountName()).append(";")
+                    .append(t.getAccountType());
 
             if (i < transactions.size() - 1) {
                 sb.append("#");
@@ -102,22 +137,25 @@ public class TransactionService {
 
     // ====== UPDATE ======
 
-    // Format command: UPDATE|id|username|date|description|category|type|amount|accountName|accountType
-    // Also supports old format: UPDATE|id|username|date|description|category|type|amount (backward compatibility)
+    // Format command:
+    // UPDATE|id|username|date|description|category|type|amount|accountName|accountType
+    // Also supports old format:
+    // UPDATE|id|username|date|description|category|type|amount (backward
+    // compatibility)
     public synchronized boolean updateTransactionFromCommand(String commandLine) {
         String[] parts = commandLine.split("\\|");
         if (parts.length != 8 && parts.length != 10) {
             throw new IllegalArgumentException("Format UPDATE tidak valid: " + commandLine);
         }
 
-        String id          = parts[1];
-        String username    = parts[2];
-        String date        = parts[3];
+        String id = parts[1];
+        String username = parts[2];
+        String date = parts[3];
         String description = parts[4];
-        String category    = parts[5];
-        String type        = parts[6];
-        long amount        = (long) Double.parseDouble(parts[7]);
-        
+        String category = parts[5];
+        String type = parts[6];
+        long amount = (long) Double.parseDouble(parts[7]);
+
         // Support backward compatibility with old format
         String accountName = (parts.length == 10) ? parts[8] : "-";
         String accountType = (parts.length == 10) ? parts[9] : "-";
@@ -126,16 +164,23 @@ public class TransactionService {
     }
 
     public synchronized boolean updateTransaction(String id,
-                                                  String username,
-                                                  String date,
-                                                  String description,
-                                                  String category,
-                                                  String type,
-                                                  long amount,
-                                                  String accountName,
-                                                  String accountType) {
+            String username,
+            String date,
+            String description,
+            String category,
+            String type,
+            long amount,
+            String accountName,
+            String accountType) {
         for (Transaction t : transactions) {
             if (t.getId().equals(id)) {
+                // Reverse old transaction's balance effect
+                if (accountService != null && !t.getAccountName().equals("-")) {
+                    long oldDelta = "INCOME".equalsIgnoreCase(t.getType()) ? t.getAmount() : -t.getAmount();
+                    accountService.adjustBalance(t.getUsername(), t.getAccountName(), t.getAccountType(), -oldDelta);
+                }
+
+                // Update transaction fields
                 t.setUsername(username);
                 t.setDate(date);
                 t.setDescription(description);
@@ -146,6 +191,13 @@ public class TransactionService {
                 t.setAccountType(accountType);
 
                 fileManager.saveAll(transactions);
+
+                // Apply new transaction's balance effect
+                if (accountService != null && !accountName.equals("-")) {
+                    long newDelta = "INCOME".equalsIgnoreCase(type) ? amount : -amount;
+                    accountService.adjustBalance(username, accountName, accountType, newDelta);
+                }
+
                 return true;
             }
         }
@@ -165,9 +217,26 @@ public class TransactionService {
     }
 
     public synchronized boolean deleteTransaction(String id) {
+        // Find transaction to reverse its balance effect
+        Transaction toDelete = null;
+        for (Transaction t : transactions) {
+            if (t.getId().equals(id)) {
+                toDelete = t;
+                break;
+            }
+        }
+
         boolean removed = transactions.removeIf(t -> t.getId().equals(id));
         if (removed) {
             fileManager.saveAll(transactions);
+
+            // Reverse the transaction's balance effect
+            if (toDelete != null && accountService != null && !toDelete.getAccountName().equals("-")) {
+                long delta = "INCOME".equalsIgnoreCase(toDelete.getType()) ? toDelete.getAmount()
+                        : -toDelete.getAmount();
+                accountService.adjustBalance(toDelete.getUsername(), toDelete.getAccountName(),
+                        toDelete.getAccountType(), -delta);
+            }
         }
         return removed;
     }
@@ -179,7 +248,7 @@ public class TransactionService {
      * Format: GET_MONTHLY_SUMMARY|username|yearMonth
      * Returns: MONTHLY_SUMMARY|yearMonth|income|expense|balance
      * 
-     * @param username The username to filter by
+     * @param username  The username to filter by
      * @param yearMonth The year-month in format YYYY-MM
      * @return Formatted response string
      */
@@ -209,7 +278,7 @@ public class TransactionService {
      * Format: GET_CATEGORY_BREAKDOWN|username|yearMonth
      * Returns: CATEGORY_BREAKDOWN|count|cat1|amount1|cat2|amount2|...
      * 
-     * @param username The username to filter by
+     * @param username  The username to filter by
      * @param yearMonth The year-month in format YYYY-MM
      * @return Formatted response string
      */
@@ -219,10 +288,10 @@ public class TransactionService {
 
         // Filter transactions by username, yearMonth, and type=EXPENSE
         for (Transaction t : transactions) {
-            if (t.getUsername().equals(username) 
-                && t.getDate().startsWith(yearMonth)
-                && "EXPENSE".equalsIgnoreCase(t.getType())) {
-                
+            if (t.getUsername().equals(username)
+                    && t.getDate().startsWith(yearMonth)
+                    && "EXPENSE".equalsIgnoreCase(t.getType())) {
+
                 String category = t.getCategory();
                 categoryMap.put(category, categoryMap.getOrDefault(category, 0L) + t.getAmount());
             }
@@ -246,9 +315,9 @@ public class TransactionService {
      * Format: FILTER_TRANSACTIONS|date|category|account
      * Returns: DATA_ALL format with filtered results
      * 
-     * @param date Optional date filter (empty string to skip)
+     * @param date     Optional date filter (empty string to skip)
      * @param category Optional category filter (empty string to skip)
-     * @param account Optional account filter (empty string to skip)
+     * @param account  Optional account filter (empty string to skip)
      * @return Formatted response string in DATA_ALL format
      */
     public synchronized String filterTransactions(String date, String category, String account) {
@@ -284,13 +353,13 @@ public class TransactionService {
         for (int i = 0; i < filtered.size(); i++) {
             Transaction t = filtered.get(i);
             sb.append(t.getId()).append(";")
-              .append(t.getDate()).append(";")
-              .append(t.getDescription()).append(";")
-              .append(t.getCategory()).append(";")
-              .append(t.getType()).append(";")
-              .append(t.getAmount()).append(";")
-              .append(t.getAccountName()).append(";")
-              .append(t.getAccountType());
+                    .append(t.getDate()).append(";")
+                    .append(t.getDescription()).append(";")
+                    .append(t.getCategory()).append(";")
+                    .append(t.getType()).append(";")
+                    .append(t.getAmount()).append(";")
+                    .append(t.getAccountName()).append(";")
+                    .append(t.getAccountType());
 
             if (i < filtered.size() - 1) {
                 sb.append("#");

@@ -1,0 +1,13 @@
+|Pengeluaran|Makanan & Minuman
+|Pengeluaran|Transportasi
+|Pengeluaran|Belanja
+|Pengeluaran|Hiburan
+|Pengeluaran|Tagihan
+|Pengeluaran|Kesehatan
+|Pengeluaran|Pendidikan
+|Pengeluaran|Lainnya
+|Pemasukan|Gaji
+|Pemasukan|Freelance
+|Pemasukan|Investasi
+|Pemasukan|Bonus
+|Pemasukan|Lainnya
