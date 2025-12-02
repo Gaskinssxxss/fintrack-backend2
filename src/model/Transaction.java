@@ -1,3 +1,5 @@
+package model;
+
 import java.io.Serializable;
 
 public class Transaction implements Serializable {
@@ -8,11 +10,13 @@ public class Transaction implements Serializable {
     private String description; // keterangan
     private String category;    // contoh: Gaji, Makanan, Transport
     private String type;        // "INCOME" atau "EXPENSE"
-    private double amount;      // nominal
+    private long amount;        // nominal (changed from double to long)
+    private String accountName; // nama akun (e.g., "BCA Savings")
+    private String accountType; // tipe akun (e.g., "Bank", "Dompet Digital")
 
     public Transaction(String id, String username, String date,
                        String description, String category,
-                       String type, double amount) {
+                       String type, long amount, String accountName, String accountType) {
         this.id = id;
         this.username = username;
         this.date = date;
@@ -20,29 +24,49 @@ public class Transaction implements Serializable {
         this.category = category;
         this.type = type;
         this.amount = amount;
+        this.accountName = accountName;
+        this.accountType = accountType;
     }
 
     // Dipakai saat simpan ke file (Stream)
     public String toCSV() {
         return id + "|" + username + "|" + date + "|" + description + "|" 
-               + category + "|" + type + "|" + amount;
+               + category + "|" + type + "|" + amount + "|" + accountName + "|" + accountType;
     }
 
     // Dipakai saat baca dari file
     public static Transaction fromCSV(String line) {
         String[] parts = line.split("\\|");
-        if (parts.length != 7) {
+        // Support both old format (7 fields) and new format (9 fields)
+        if (parts.length == 7) {
+            // Old format: convert double to long and use default account values
+            return new Transaction(
+                    parts[0],                       // id
+                    parts[1],                       // username
+                    parts[2],                       // date
+                    parts[3],                       // description
+                    parts[4],                       // category
+                    parts[5],                       // type
+                    (long) Double.parseDouble(parts[6]), // amount (convert double to long)
+                    "-",                            // accountName (default)
+                    "-"                             // accountType (default)
+            );
+        } else if (parts.length == 9) {
+            // New format
+            return new Transaction(
+                    parts[0],                       // id
+                    parts[1],                       // username
+                    parts[2],                       // date
+                    parts[3],                       // description
+                    parts[4],                       // category
+                    parts[5],                       // type
+                    Long.parseLong(parts[6]),       // amount
+                    parts[7],                       // accountName
+                    parts[8]                        // accountType
+            );
+        } else {
             throw new IllegalArgumentException("Format data tidak valid: " + line);
         }
-        return new Transaction(
-                parts[0],                       // id
-                parts[1],                       // username
-                parts[2],                       // date
-                parts[3],                       // description
-                parts[4],                       // category
-                parts[5],                       // type
-                Double.parseDouble(parts[6])    // amount
-        );
     }
 
     public String getId() {
@@ -69,8 +93,16 @@ public class Transaction implements Serializable {
         return type;
     }
 
-    public double getAmount() {
+    public long getAmount() {
         return amount;
+    }
+
+    public String getAccountName() {
+        return accountName;
+    }
+
+    public String getAccountType() {
+        return accountType;
     }
 
     public void setId(String id) {
@@ -97,7 +129,15 @@ public class Transaction implements Serializable {
         this.type = type;
     }
 
-    public void setAmount(double amount) {
+    public void setAmount(long amount) {
         this.amount = amount;
+    }
+
+    public void setAccountName(String accountName) {
+        this.accountName = accountName;
+    }
+
+    public void setAccountType(String accountType) {
+        this.accountType = accountType;
     }
 }

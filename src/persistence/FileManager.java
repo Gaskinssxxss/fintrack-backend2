@@ -1,3 +1,6 @@
+package persistence;
+
+import model.Transaction;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;

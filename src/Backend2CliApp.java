@@ -1,18 +1,117 @@
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Scanner;
+import util.RequestLogger;
 
 public class Backend2CliApp {
 
     private final Backend2Facade backend;
     private final Scanner scanner;
+    private final RequestLogger logger;
 
     // "Session" sederhana di sisi CLI: siapa user yang sedang login
     private String currentUsername = null;
 
+    // ANSI color codes for better visibility
+    private static final String RESET = "\u001B[0m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String RED = "\u001B[31m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String BLUE = "\u001B[34m";
+    private static final String CYAN = "\u001B[36m";
+    private static final String BOLD = "\u001B[1m";
+
     public Backend2CliApp() {
         this.backend = new Backend2Facade();
         this.scanner = new Scanner(System.in);
+        this.logger = RequestLogger.getInstance();
+    }
+
+    // Helper method to execute command with logging
+    private String executeCommand(String command) {
+        // Log request
+        logger.logRequest(command, currentUsername != null ? currentUsername : "GUEST");
+        
+        // Execute command
+        String response = backend.handleTextCommand(command);
+        
+        // Log response
+        if (response.startsWith("ERROR")) {
+            logger.logError(command, response);
+        } else {
+            logger.logSuccess(command, response);
+        }
+        
+        return response;
+    }
+
+    // Helper method to print status with color coding
+    private void printStatus(String status, String message) {
+        String color;
+        String statusLabel;
+        
+        switch (status) {
+            case "SUCCESS":
+                color = GREEN;
+                statusLabel = "[✓ SUCCESS]";
+                break;
+            case "ERROR":
+                color = RED;
+                statusLabel = "[✗ ERROR]";
+                break;
+            case "INFO":
+                color = CYAN;
+                statusLabel = "[ℹ INFO]";
+                break;
+            case "WARNING":
+                color = YELLOW;
+                statusLabel = "[⚠ WARNING]";
+                break;
+            default:
+                color = RESET;
+                statusLabel = "[" + status + "]";
+        }
+        
+        System.out.println(color + BOLD + statusLabel + RESET + " " + message);
+    }
+
+    // Helper to print request/response with formatting
+    private void printRequest(String command) {
+        System.out.println(BLUE + "┌─ REQUEST" + RESET);
+        System.out.println(BLUE + "│ " + RESET + command);
+        System.out.println(BLUE + "└─" + RESET);
+    }
+
+    private void printResponse(String response, String statusCode) {
+        System.out.println(CYAN + "┌─ RESPONSE [" + statusCode + "]" + RESET);
+        System.out.println(CYAN + "│ " + RESET + response);
+        System.out.println(CYAN + "└─" + RESET);
+    }
+
+    // Parse status code from response
+    private String getStatusCode(String response) {
+        if (response == null || response.isEmpty()) {
+            return "UNKNOWN";
+        }
+        
+        if (response.startsWith("OK")) return "200";
+        if (response.startsWith("LOGIN_OK")) return "200";
+        if (response.startsWith("SUMMARY")) return "200";
+        if (response.startsWith("DATA_ALL")) return "200";
+        if (response.startsWith("FILE_SIZE")) return "200";
+        if (response.startsWith("ERROR")) return "400";
+        
+        return "UNKNOWN";
+    }
+
+    // Determine if response is success
+    private boolean isSuccess(String response) {
+        return response != null && 
+               (response.startsWith("OK") || 
+                response.startsWith("LOGIN_OK") || 
+                response.startsWith("SUMMARY") || 
+                response.startsWith("DATA_ALL") ||
+                response.startsWith("FILE_SIZE"));
     }
 
     public static void main(String[] args) {
@@ -148,51 +247,72 @@ public class Backend2CliApp {
     }
 
     private void doRegister() {
-        System.out.println("\n--- REGISTER USER ---");
+        System.out.println("\n" + BOLD + "--- REGISTER USER ---" + RESET);
         String username = askNonEmpty("Username", "indra");
         String password = askNonEmpty("Password", "12345");
 
         String cmd = "REGISTER|" + username + "|" + password;
-        String resp = backend.handleTextCommand(cmd);
-        System.out.println("RESP: " + resp);
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "User '" + username + "' berhasil didaftarkan");
+        } else {
+            printStatus("ERROR", "Registrasi gagal");
+        }
     }
 
     private void doLogin() {
-        System.out.println("\n--- LOGIN USER ---");
+        System.out.println("\n" + BOLD + "--- LOGIN USER ---" + RESET);
         String username = askNonEmpty("Username", "indra");
         String password = askNonEmpty("Password", "12345");
 
         String cmd = "LOGIN|" + username + "|" + password;
-        String resp = backend.handleTextCommand(cmd);
-        System.out.println("RESP: " + resp);
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
 
         if (resp.startsWith("LOGIN_OK|")) {
             // Ambil username dari response dan set sebagai user aktif
             String[] parts = resp.split("\\|");
             if (parts.length >= 2) {
                 currentUsername = parts[1];
-                System.out.println(">> Login berhasil. User aktif sekarang: " + currentUsername);
+                printStatus("SUCCESS", "Login berhasil. User aktif: " + currentUsername);
             }
         } else {
-            System.out.println(">> Login gagal. User aktif tidak berubah.");
+            printStatus("ERROR", "Login gagal. User aktif tidak berubah");
         }
     }
 
     private void doChangePassword() {
-        System.out.println("\n--- CHANGE PASSWORD ---");
+        System.out.println("\n" + BOLD + "--- CHANGE PASSWORD ---" + RESET);
 
         if (currentUsername == null) {
-            System.out.println("Anda belum LOGIN. Silakan login dahulu di menu User API.");
+            printStatus("WARNING", "Anda belum LOGIN. Silakan login dahulu di menu User API");
             return;
         }
 
-        System.out.println("User yang akan diganti password-nya: " + currentUsername);
+        printStatus("INFO", "User yang akan diganti password-nya: " + currentUsername);
         String oldPass  = askNonEmpty("Password lama", "12345");
         String newPass  = askNonEmpty("Password baru", "99999");
 
         String cmd = "CHANGE_PASSWORD|" + currentUsername + "|" + oldPass + "|" + newPass;
-        String resp = backend.handleTextCommand(cmd);
-        System.out.println("RESP: " + resp);
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Password berhasil diubah");
+        } else {
+            printStatus("ERROR", "Gagal mengubah password");
+        }
     }
 
     // ===================== TRANSACTION MENU =====================
@@ -245,83 +365,131 @@ public class Backend2CliApp {
     }
 
     private void doAddTransaction() {
-        System.out.println("\n--- ADD TRANSACTION ---");
+        System.out.println("\n" + BOLD + "--- ADD TRANSACTION ---" + RESET);
 
         if (currentUsername == null) {
-            System.out.println("Anda belum LOGIN. Operasi dibatalkan.");
+            printStatus("WARNING", "Anda belum LOGIN. Operasi dibatalkan");
             return;
         }
 
-        String date     = askNonEmpty("Tanggal (YYYY-MM-DD)", "2025-12-02");
-        String desc     = askNonEmpty("Deskripsi", "Gaji Bulanan");
-        String category = askNonEmpty("Kategori", "Gaji / Makanan / Transport");
-        String type     = askTypeOption();
-        double amount   = askDouble("Jumlah (angka)", "8500000");
+        String date        = askNonEmpty("Tanggal (YYYY-MM-DD)", "2025-12-02");
+        String desc        = askNonEmpty("Deskripsi", "Gaji Bulanan");
+        String category    = askNonEmpty("Kategori", "Gaji / Makanan / Transport");
+        String type        = askTypeOption();
+        double amount      = askDouble("Jumlah (angka)", "8500000");
+        String accountName = askNonEmpty("Nama Akun", "BCA Savings / GoPay / Cash");
+        String accountType = askNonEmpty("Tipe Akun", "Bank / Dompet Digital / Tunai");
 
         // Username tidak ditanya lagi, pakai currentUsername
-        String cmd = "ADD|" + currentUsername + "|" + date + "|" + desc + "|" + category + "|" + type + "|" + amount;
-        String resp = backend.handleTextCommand(cmd);
-        System.out.println("RESP (SUMMARY): " + resp);
+        String cmd = "ADD|" + currentUsername + "|" + date + "|" + desc + "|" + category + "|" + type + "|" + amount + "|" + accountName + "|" + accountType;
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Transaksi berhasil ditambahkan");
+            printStatus("INFO", "Summary updated: " + resp);
+        } else {
+            printStatus("ERROR", "Gagal menambahkan transaksi");
+        }
     }
 
     private void doUpdateTransaction() {
-        System.out.println("\n--- UPDATE TRANSACTION ---");
+        System.out.println("\n" + BOLD + "--- UPDATE TRANSACTION ---" + RESET);
 
         if (currentUsername == null) {
-            System.out.println("Anda belum LOGIN. Operasi dibatalkan.");
+            printStatus("WARNING", "Anda belum LOGIN. Operasi dibatalkan");
             return;
         }
 
-        System.out.println("Tips:");
-        System.out.println("- Jalankan dulu menu: GET_ALL untuk melihat ID transaksi.");
-        System.out.println("- Copy ID dari sana, lalu paste di sini.");
-        String id       = askNonEmpty("ID transaksi yang akan di-update", "622b3592-...");
+        printStatus("INFO", "Tips: Jalankan GET_ALL untuk melihat ID transaksi");
+        String id          = askNonEmpty("ID transaksi yang akan di-update", "622b3592-...");
 
-        String date     = askNonEmpty("Tanggal baru (YYYY-MM-DD)", "2025-12-05");
-        String desc     = askNonEmpty("Deskripsi baru", "Gaji Bonus");
-        String category = askNonEmpty("Kategori baru", "Gaji / Makanan / Hiburan");
-        String type     = askTypeOption();
-        double amount   = askDouble("Jumlah baru (angka)", "5000000");
+        String date        = askNonEmpty("Tanggal baru (YYYY-MM-DD)", "2025-12-05");
+        String desc        = askNonEmpty("Deskripsi baru", "Gaji Bonus");
+        String category    = askNonEmpty("Kategori baru", "Gaji / Makanan / Hiburan");
+        String type        = askTypeOption();
+        double amount      = askDouble("Jumlah baru (angka)", "5000000");
+        String accountName = askNonEmpty("Nama Akun baru", "BCA Savings / GoPay / Cash");
+        String accountType = askNonEmpty("Tipe Akun baru", "Bank / Dompet Digital / Tunai");
 
         // Username tidak diminta lagi, pakai currentUsername
-        String cmd = "UPDATE|" + id + "|" + currentUsername + "|" + date + "|" + desc + "|" + category + "|" + type + "|" + amount;
-        String resp = backend.handleTextCommand(cmd);
-        System.out.println("RESP: " + resp);
+        String cmd = "UPDATE|" + id + "|" + currentUsername + "|" + date + "|" + desc + "|" + category + "|" + type + "|" + amount + "|" + accountName + "|" + accountType;
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Transaksi berhasil diupdate");
+        } else {
+            printStatus("ERROR", "Gagal mengupdate transaksi");
+        }
     }
 
     private void doDeleteTransaction() {
-        System.out.println("\n--- DELETE TRANSACTION ---");
+        System.out.println("\n" + BOLD + "--- DELETE TRANSACTION ---" + RESET);
 
         if (currentUsername == null) {
-            System.out.println("Anda belum LOGIN. Operasi dibatalkan.");
+            printStatus("WARNING", "Anda belum LOGIN. Operasi dibatalkan");
             return;
         }
 
-        System.out.println("Tips:");
-        System.out.println("- Jalankan dulu menu: GET_ALL untuk melihat ID transaksi.");
-        System.out.println("- Copy ID dari sana, lalu paste di sini.");
+        printStatus("INFO", "Tips: Jalankan GET_ALL untuk melihat ID transaksi");
         String id = askNonEmpty("ID transaksi yang akan dihapus", "622b3592-...");
 
         String cmd = "DELETE|" + id;
-        String resp = backend.handleTextCommand(cmd);
-        System.out.println("RESP: " + resp);
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Transaksi berhasil dihapus");
+        } else {
+            printStatus("ERROR", "Gagal menghapus transaksi");
+        }
     }
 
     private void doGetAllTransactions() {
-        System.out.println("\n--- GET_ALL TRANSACTIONS ---");
-        String resp = backend.handleTextCommand("GET_ALL");
-        System.out.println("RESP:");
-        System.out.println(resp);
-        System.out.println("\nCatatan:");
-        System.out.println("- Format: DATA_ALL|id;date;description;category;type;amount#id2;...");
-        System.out.println("- ID inilah yang dipakai untuk UPDATE / DELETE.");
+        System.out.println("\n" + BOLD + "--- GET_ALL TRANSACTIONS ---" + RESET);
+        
+        String cmd = "GET_ALL";
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Data transaksi berhasil diambil");
+            printStatus("INFO", "Format: DATA_ALL|id;date;description;category;type;amount#id2;...");
+            printStatus("INFO", "ID digunakan untuk UPDATE / DELETE");
+        } else {
+            printStatus("ERROR", "Gagal mengambil data transaksi");
+        }
     }
 
     private void doGetSummary() {
-        System.out.println("\n--- GET_SUMMARY ---");
-        String resp = backend.handleTextCommand("GET_SUMMARY");
-        System.out.println("RESP: " + resp);
-        System.out.println("Format: SUMMARY|totalBalance|totalIncome|totalExpense");
+        System.out.println("\n" + BOLD + "--- GET_SUMMARY ---" + RESET);
+        
+        String cmd = "GET_SUMMARY";
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Summary berhasil diambil");
+            printStatus("INFO", "Format: SUMMARY|totalBalance|totalIncome|totalExpense");
+        } else {
+            printStatus("ERROR", "Gagal mengambil summary");
+        }
     }
 
     // ===================== REPORT MENU =====================
@@ -355,24 +523,40 @@ public class Backend2CliApp {
     }
 
     private void doReqReportHeader() {
-        System.out.println("\n--- REQ_REPORT HEADER ---");
-        String resp = backend.handleTextCommand("REQ_REPORT");
-        System.out.println("RESP: " + resp);
-        System.out.println("Format: FILE_SIZE|<panjang_dalam_byte>");
+        System.out.println("\n" + BOLD + "--- REQ_REPORT HEADER ---" + RESET);
+        
+        String cmd = "REQ_REPORT";
+        printRequest(cmd);
+        
+        String resp = executeCommand(cmd);
+        String statusCode = getStatusCode(resp);
+        printResponse(resp, statusCode);
+        
+        if (isSuccess(resp)) {
+            printStatus("SUCCESS", "Report header berhasil diambil");
+            printStatus("INFO", "Format: FILE_SIZE|<panjang_dalam_byte>");
+        } else {
+            printStatus("ERROR", "Gagal mengambil report header");
+        }
     }
 
     private void doGenerateReportFile() {
-        System.out.println("\n--- GENERATE REPORT CSV ---");
-        System.out.println("File akan disimpan di folder reports/ (atau path yang kamu isi).");
+        System.out.println("\n" + BOLD + "--- GENERATE REPORT CSV ---" + RESET);
+        printStatus("INFO", "File akan disimpan di folder reports/ (atau path yang kamu isi)");
         String filename = askNonEmpty("Nama file output", "reports/report_cli.csv");
 
+        printStatus("INFO", "Generating report bytes...");
         byte[] data = backend.getReportBytes();
+        
+        printStatus("INFO", "Writing to file: " + filename);
+        printStatus("INFO", "File size: " + data.length + " bytes");
+        
         try (FileOutputStream fos = new FileOutputStream(filename)) {
             fos.write(data);
-            System.out.println("Report berhasil disimpan ke file: " + filename);
-            System.out.println("Ukuran (bytes): " + data.length);
+            printStatus("SUCCESS", "Report berhasil disimpan ke: " + filename);
+            printStatus("INFO", "Total bytes written: " + data.length);
         } catch (IOException e) {
-            System.out.println("Gagal menulis file: " + e.getMessage());
+            printStatus("ERROR", "Gagal menulis file: " + e.getMessage());
         }
     }
 }

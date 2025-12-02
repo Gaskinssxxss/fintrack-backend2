@@ -1,3 +1,6 @@
+package service;
+
+import model.Transaction;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 

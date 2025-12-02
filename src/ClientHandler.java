@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import util.RequestLogger;
 
 // Using default package classes
 
@@ -51,11 +52,18 @@ public class ClientHandler implements Runnable {
     }
 
     private void handle(String msg) {
+        RequestLogger logger = RequestLogger.getInstance();
+        String command = msg.split("\\|")[0];
+        
         try {
+            // Log incoming request
+            logger.logRequest(msg, username.isEmpty() ? "ANONYMOUS" : username);
+            
             // Handle simplified LOGIN without password for FE handshake
             if (msg.startsWith("LOGIN|") && msg.split("\\|").length == 2) {
                 username = msg.substring("LOGIN|".length());
                 send("LOGIN_OK|Selamat datang " + username);
+                logger.logSuccess(command, "User logged in: " + username);
                 return;
             }
 
@@ -63,15 +71,26 @@ public class ClientHandler implements Runnable {
             String response = facade.handleTextCommand(msg);
             if (response != null && !response.isEmpty()) {
                 send(response);
+                
+                // Log response status
+                if (response.startsWith("OK") || response.startsWith("LOGIN_OK") || 
+                    response.startsWith("SUMMARY") || response.startsWith("DATA_ALL") ||
+                    response.startsWith("FILE_SIZE")) {
+                    logger.logSuccess(command, "Response: " + response.substring(0, Math.min(100, response.length())));
+                } else if (response.startsWith("ERROR")) {
+                    logger.logError(command, response);
+                }
             }
 
-            // Report streaming: REQ_REPORT -> FILE_SIZE, wait READY_TO_RECEIVE -> stream
+            // Report streaming: REQ_REPORT/REQ_DOWNLOAD -> FILE_SIZE, wait READY_TO_RECEIVE
+            // -> stream
             // bytes
-            if ("REQ_REPORT".equalsIgnoreCase(msg)) {
+            if ("REQ_REPORT".equalsIgnoreCase(msg) || "REQ_DOWNLOAD".equalsIgnoreCase(msg)) {
                 // facade already returned FILE_SIZE header above
                 String ready = in.readLine();
                 if ("READY_TO_RECEIVE".equalsIgnoreCase(ready)) {
                     facade.writeReportToStream(socket.getOutputStream());
+                    logger.logSuccess(command, "Report streamed successfully");
                 }
                 return;
             }
@@ -81,9 +100,11 @@ public class ClientHandler implements Runnable {
                 server.broadcast("REFRESH_TABLE");
                 String summary = facade.handleTextCommand("GET_SUMMARY");
                 server.broadcast(summary);
+                logger.logInfo(command, "Broadcast triggered for data change");
             }
         } catch (Exception e) {
             send("ERROR|" + e.getMessage());
+            logger.logError(command, "Exception: " + e.getMessage());
         }
     }
 }

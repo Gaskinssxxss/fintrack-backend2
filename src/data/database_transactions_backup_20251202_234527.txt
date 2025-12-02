@@ -1,0 +1,28 @@
+b6ee6ed5-a48c-44d3-9aa8-88e372a45fdc|testuser|2025-11-18|Lunch|Makanan & Minuman|EXPENSE|50000|BCA Savings|Bank
+dbc47575-6f37-4121-a524-434da131a22c|testuser|2025-11-18|Salary|Gaji|INCOME|5000000|-|-
+3bd3b10e-9aaf-43ee-ad73-17298171f4b0|testuser|2025-11-18|Lunch|Food|EXPENSE|50000|BCA|Bank
+6a50cd91-036a-45e7-ac47-802fbbb4be67|testuser|2025-11-18|Salary|Income|INCOME|5000000|BCA|Bank
+5a0e495e-447f-4a47-b56d-44cac54d947c|testuser|2025-11-20|Dinner|Food|EXPENSE|75000|GoPay|Dompet Digital
+e06568cd-de6a-4686-8c67-a1b5bafdbc1c|testuser|2025-12-01|Shopping|Shopping|EXPENSE|200000|BCA|Bank
+2b7b989e-deda-4e85-8713-180d5c1f60eb|testuser|2025-12-01|Transport|Transport|EXPENSE|25000|-|-
+c7915d0c-bc31-45ec-8a01-95b3277d5f67|testuser|2025-11-18|Lunch|Food|EXPENSE|50000|BCA|Bank
+e62059fd-cc6a-4d8a-bc59-c91c1193a511|testuser|2025-11-18|Salary|Income|INCOME|5000000|BCA|Bank
+20c3308c-5cec-4241-8c37-b7b426af4e8b|testuser|2025-11-20|Dinner|Food|EXPENSE|75000|GoPay|Dompet Digital
+3f366b89-5730-4570-9f0c-9b99ddbff0de|testuser|2025-12-01|Shopping|Shopping|EXPENSE|200000|BCA|Bank
+178c89ad-9876-4f5c-8f96-fdaa3555be7d|testuser|2025-12-01|Transport|Transport|EXPENSE|25000|-|-
+066a88ff-e12f-4231-88fb-a352b1d03316|testuser|2025-11-18|Lunch|Makanan & Minuman|EXPENSE|50000|BCA Savings|Bank
+13cfc243-4c76-4de5-a19e-01372f86e64a|testuser|2025-11-18|Salary|Gaji|INCOME|5000000|-|-
+53795bb3-cc6f-4fe4-9256-1d9d653deb6c|testuser|2025-11-18|Lunch|Food|EXPENSE|50000|BCA|Bank
+b8604a01-9799-4ccd-abdf-28d976f69d80|testuser|2025-11-18|Salary|Income|INCOME|5000000|BCA|Bank
+27fc9a36-365b-461e-a418-82a88003d73c|testuser|2025-11-20|Dinner|Food|EXPENSE|75000|GoPay|Dompet Digital
+a499fe39-668e-4560-ab89-faff0bd79bf0|testuser|2025-12-01|Shopping|Shopping|EXPENSE|200000|BCA|Bank
+7894f917-f741-44a9-9bdb-f2bef3767204|testuser|2025-12-01|Transport|Transport|EXPENSE|25000|-|-
+ea8d6aa5-bca3-472c-9db9-f942ed95f9c7|indra|2025-12-02|Lunch|Food|EXPENSE|50000|-|-
+df2f6ae1-c320-447a-b6de-459caacf8873|indra|2025-12-02|Lunch|Food|EXPENSE|50000|BCA|Bank
+4cdf1899-0a1a-409d-bf03-b7faa1b26009|indra|2025-12-02|Lunch|Food|EXPENSE|50000|BCA|Bank
+5fc9aeb6-34ea-4e1f-918a-70a62699ec28|indra|2025-12-02|Lunch|Food|EXPENSE|50000|BCA|Bank
+e952a84a-ff4b-423e-81bb-daaa9105e08b|indra|2025-12-02|Lunch|Food|EXPENSE|50000|BCA|Bank
+84b1b3a6-4419-4944-8abd-0b7edf46f363|indra|2025-12-02|Lunch|Food|EXPENSE|50000|BCA|Bank
+dc99212a-81e7-44b9-ae14-0f2f1b902709|indra|2025-12-02|Lunch|Food|EXPENSE|50000|BCA|Bank
+395825d8-f7ba-4e5c-858d-fddcad49f1c2|authuser|2025-12-01|Test Transaction|Makanan|EXPENSE|50000|BCA|Bank
+10e5714d-a03c-42ea-b0d1-64de425c7c8c|flowuser|2025-12-02|Morning Coffee|Coffee|EXPENSE|45000|My Wallet|Cash
